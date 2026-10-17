@@ -86,6 +86,22 @@ body,
   border-radius: 9999px;
   touch-action: none;
 }
+.touch-btn-on {
+  background: rgba(179, 38, 44, 0.65);
+  border-color: rgba(233, 220, 192, 0.7);
+}
+.stick-base {
+  border-radius: 9999px;
+  background: rgba(11, 5, 7, 0.35);
+  border: 1.5px solid rgba(233, 220, 192, 0.35);
+}
+.stick-knob {
+  width: 52px;
+  height: 52px;
+  border-radius: 9999px;
+  background: rgba(233, 220, 192, 0.55);
+  box-shadow: 3px 3px 0 rgba(11, 5, 7, 0.7);
+}
 .touch-btn:active {
   background: rgba(122, 31, 36, 0.7);
 }

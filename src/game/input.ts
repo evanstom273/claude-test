@@ -1,4 +1,4 @@
-export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'roll' | 'heal' | 'interact' | 'pause'
+export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'roll' | 'heal' | 'interact' | 'lock' | 'pause'
 
 const KEYS: Record<string, Action> = {
   ArrowLeft: 'left',
@@ -18,6 +18,7 @@ const KEYS: Record<string, Action> = {
   KeyF: 'heal',
   KeyQ: 'heal',
   KeyE: 'interact',
+  Tab: 'lock',
   Escape: 'pause',
   KeyP: 'pause',
 }
@@ -32,6 +33,7 @@ const PAD: [number, Action][] = [
   [5, 'light'],
   [7, 'heavy'],
   [9, 'pause'],
+  [11, 'lock'],
   [12, 'interact'],
   [14, 'left'],
   [15, 'right'],
@@ -47,6 +49,9 @@ export class InputState {
   private sources = new Map<string, Set<Action>>()
   private pressed = new Map<Action, number>()
   private padPrev = new Set<Action>()
+  private padX = 0
+  /** Analog x from the touch joystick, or null when it isn't held. */
+  stickX: number | null = null
   onPause: (() => void) | null = null
 
   private set(source: string, a: Action, down: boolean) {
@@ -64,6 +69,20 @@ export class InputState {
       return
     }
     this.pressed.set(a, performance.now())
+  }
+
+  /** Horizontal movement in [-1, 1]: touch stick or left stick if active, else keys. */
+  dir() {
+    const dz = (v: number, d: number) => (Math.abs(v) < d ? 0 : Math.sign(v) * Math.min(1, (Math.abs(v) - d) / (1 - d)))
+    if (this.stickX !== null && Math.abs(this.stickX) > 0.15) return dz(this.stickX, 0.15)
+    if (Math.abs(this.padX) > 0.25) return dz(this.padX, 0.25)
+    return (this.held('right') ? 1 : 0) - (this.held('left') ? 1 : 0)
+  }
+
+  /** Touch joystick position, each axis in [-1, 1]; pass null on release. */
+  stick(x: number | null, y = 0) {
+    this.stickX = x
+    this.set('stick', 'down', x !== null && y > 0.6)
   }
 
   held(a: Action) {
@@ -112,10 +131,12 @@ export class InputState {
     const md = (e: MouseEvent) => {
       if ((e.target as Element)?.closest?.('button')) return
       if (e.button === 0) this.set('mouse', 'light', true)
+      if (e.button === 1) this.set('mouse', 'lock', true)
       if (e.button === 2) this.set('mouse', 'heavy', true)
     }
     const mu = (e: MouseEvent) => {
       if (e.button === 0) this.set('mouse', 'light', false)
+      if (e.button === 1) this.set('mouse', 'lock', false)
       if (e.button === 2) this.set('mouse', 'heavy', false)
     }
     const cm = (e: Event) => e.preventDefault()
@@ -139,13 +160,13 @@ export class InputState {
   pollGamepad() {
     const pads = navigator.getGamepads?.() ?? []
     const now = new Set<Action>()
+    this.padX = 0
     for (const gp of pads) {
       if (!gp) continue
       for (const [i, a] of PAD) if (gp.buttons[i]?.pressed) now.add(a)
       const ax = gp.axes[0] ?? 0
       const ay = gp.axes[1] ?? 0
-      if (ax < -0.4) now.add('left')
-      if (ax > 0.4) now.add('right')
+      if (Math.abs(ax) > Math.abs(this.padX)) this.padX = ax
       if (ay < -0.6) now.add('interact')
       if (ay > 0.6) now.add('down')
     }

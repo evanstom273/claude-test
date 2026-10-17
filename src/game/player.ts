@@ -76,6 +76,8 @@ export function createPlayer(): Player {
     airT: 0,
     wasOnGround: true,
     dropT: 0,
+    lockOn: false,
+    rollDir: 1,
   }
 }
 
@@ -103,8 +105,9 @@ function startAttack(w: World, p: Player, id: AttackId, input: InputState) {
     w.events.push({ type: 'noStamina' })
     return false
   }
-  if (input.held('left')) p.facing = -1
-  else if (input.held('right')) p.facing = 1
+  const d = input.dir()
+  if (p.lockOn) p.facing = w.enemy.body.x >= p.body.x ? 1 : -1
+  else if (d) p.facing = d > 0 ? 1 : -1
   spend(p, a.stam)
   p.attack = id
   p.hitDone = false
@@ -120,14 +123,21 @@ function tryRoll(w: World, p: Player, input: InputState) {
     w.events.push({ type: 'noStamina' })
     return false
   }
-  if (input.held('left')) p.facing = -1
-  else if (input.held('right')) p.facing = 1
+  const d = input.dir()
+  if (p.lockOn) {
+    // locked on: roll the way you're pushing, or hop back away from him
+    p.facing = w.enemy.body.x >= p.body.x ? 1 : -1
+    p.rollDir = d ? (d > 0 ? 1 : -1) : ((-p.facing) as 1 | -1)
+  } else {
+    if (d) p.facing = d > 0 ? 1 : -1
+    p.rollDir = p.facing
+  }
   spend(p, P.rollCost)
   setState(p, 'roll')
   p.attack = null
   p.body.h = P.rollHeight
   w.events.push({ type: 'roll' })
-  emit(w, 6, p.body.x, p.body.y - 4, { kind: 'dust', colors: ['#6b5a3e', '#8a7550'], speed: 120, spread: 1.2, dir: p.facing === 1 ? Math.PI : 0, size: 7, life: 0.5, gravity: -40 })
+  emit(w, 6, p.body.x, p.body.y - 4, { kind: 'dust', colors: ['#6b5a3e', '#8a7550'], speed: 120, spread: 1.2, dir: p.rollDir === 1 ? Math.PI : 0, size: 7, life: 0.5, gravity: -40 })
   return true
 }
 
@@ -161,14 +171,21 @@ export function updatePlayer(w: World, p: Player, input: InputState, dt: number)
     p.stamina = Math.min(p.maxStamina, p.stamina + P.stamRegen * rate * dt)
   }
 
-  const dirIn = (input.held('right') ? 1 : 0) - (input.held('left') ? 1 : 0)
+  const dirIn = input.dir()
+  const target = w.enemy
+  if (p.lockOn && (target.state === 'dead' || Math.abs(target.body.x - b.x) > 950 || p.state === 'dead')) p.lockOn = false
+  const lockFace: 1 | -1 = target.body.x >= b.x ? 1 : -1
   let gravity = P.gravity
   let control = 1
   let maxSpeed = P.run
 
   switch (p.state) {
     case 'move': {
-      if (dirIn) p.facing = dirIn > 0 ? 1 : -1
+      if (p.lockOn) {
+        p.facing = lockFace
+        // backing away while facing him is slower, like a backpedal
+        if (dirIn && Math.sign(dirIn) !== p.facing) maxSpeed = P.run * 0.62
+      } else if (dirIn) p.facing = dirIn > 0 ? 1 : -1
       if (b.onGround) p.coyote = P.coyote
       else p.coyote -= dt
 
@@ -212,11 +229,12 @@ export function updatePlayer(w: World, p: Player, input: InputState, dt: number)
     case 'roll': {
       const k = p.t / P.rollTime
       const speed = P.rollSpeed * (1 - k * k * 0.75)
-      b.vx = p.facing * speed
+      b.vx = p.rollDir * speed
       control = 0
       if (p.t >= P.rollIFrames[0] && p.t <= P.rollIFrames[1]) p.invuln = Math.max(p.invuln, 0.016)
       if (p.t >= P.rollTime) {
         b.h = P.height
+        if (p.lockOn) p.facing = lockFace
         setState(p, 'move')
       }
       break
@@ -265,7 +283,8 @@ export function updatePlayer(w: World, p: Player, input: InputState, dt: number)
     case 'heal': {
       maxSpeed = 70
       control = 0.5
-      if (dirIn) p.facing = dirIn > 0 ? 1 : -1
+      if (p.lockOn) p.facing = lockFace
+      else if (dirIn) p.facing = dirIn > 0 ? 1 : -1
       if (!p.healed && p.t >= P.healAt) {
         p.healed = true
         p.hp = Math.min(p.maxHp, p.hp + P.healAmount)
@@ -289,9 +308,9 @@ export function updatePlayer(w: World, p: Player, input: InputState, dt: number)
   }
 
   if (control > 0) {
-    const target = dirIn * maxSpeed
+    const want = dirIn * maxSpeed
     const acc = b.onGround ? (dirIn ? P.accGround : P.friction) : P.accAir
-    const dv = target - b.vx
+    const dv = want - b.vx
     const step = acc * control * dt
     b.vx += Math.max(-step, Math.min(step, dv))
   }
@@ -315,7 +334,8 @@ export function updatePlayer(w: World, p: Player, input: InputState, dt: number)
   }
   p.airT = b.onGround ? 0 : p.airT + dt
   p.wasOnGround = b.onGround
-  if (b.onGround && Math.abs(b.vx) > 20) p.runPhase += (Math.abs(b.vx) / P.run) * dt * 11
+  // the run cycle plays backwards when backpedalling
+  if (b.onGround && Math.abs(b.vx) > 20) p.runPhase += (b.vx * p.facing > 0 ? 1 : -1) * (Math.abs(b.vx) / P.run) * dt * 11
 }
 
 function onOneWay(b: Player['body']) {
@@ -323,6 +343,7 @@ function onOneWay(b: Player['body']) {
 }
 
 export function restPlayer(p: Player) {
+  p.lockOn = false
   p.hp = p.maxHp
   p.flasks = p.maxFlasks
   p.stamina = p.maxStamina

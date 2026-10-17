@@ -50,6 +50,8 @@ export interface Player {
   airT: number
   wasOnGround: boolean
   dropT: number
+  lockOn: boolean
+  rollDir: 1 | -1
 }
 
 export type EnemyMoveId = 'lunge' | 'swipes' | 'leap' | 'overhead' | 'backstep'
@@ -122,6 +124,7 @@ export type GameEvent =
   | { type: 'harvested' }
   | { type: 'death' }
   | { type: 'noStamina' }
+  | { type: 'lock'; on: boolean }
 
 export interface World {
   time: number

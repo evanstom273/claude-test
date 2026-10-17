@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { isMuted, setMuted, sfx } from '../game/audio'
 import { InputState } from '../game/input'
 import type { World } from '../game/types'
-import { createWorld, nearShrine, respawn, rest, step, STEP, VIEW_H } from '../game/world'
+import { createWorld, nearShrine, respawn, rest, step, STEP, toggleLock, VIEW_H } from '../game/world'
 import { Scene } from '../render/Scene'
 import { Hud } from './Hud'
 import { TouchControls } from './TouchControls'
@@ -70,6 +70,7 @@ export function Game({ onQuit }: { onQuit: () => void }) {
       last = now
       if (!pausedRef.current) {
         if (nearShrine(w) && inp.take('interact', 200)) rest(w)
+        if (inp.take('lock', 200)) toggleLock(w)
         acc += dt
         let steps = 0
         while (acc >= STEP && steps < 24) {
@@ -133,6 +134,9 @@ export function Game({ onQuit }: { onQuit: () => void }) {
             case 'noStamina':
               sfx.noStamina()
               break
+            case 'lock':
+              sfx.lock(ev.on)
+              break
           }
         }
         w.events.length = 0
@@ -180,7 +184,7 @@ export function Game({ onQuit }: { onQuit: () => void }) {
         ❚❚
       </button>
 
-      {touch && !paused && <TouchControls input={input.current} canRest={canRest} />}
+      {touch && !paused && <TouchControls input={input.current} canRest={canRest} locked={w.player.lockOn} />}
 
       {paused && (
         <PauseMenu
@@ -252,9 +256,10 @@ function PauseMenu({ muted, debug, onResume, onMute, onDebug, onQuit }: { muted:
     ['Strike', 'J · left click (chain three)'],
     ['Heavy', 'K · right click'],
     ['Roll', 'Shift · L'],
+    ['Lock on', 'Tab · middle click'],
     ['Drink honey', 'F · Q'],
     ['Rest', 'E at the shrine'],
-    ['Gamepad', 'A jump · B roll · X strike · Y heavy · LB heal'],
+    ['Gamepad', 'A jump · B roll · X strike · Y heavy · LB heal · R3 lock on'],
   ]
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-[#0b0507]/75 p-4 backdrop-blur-[2px] fade-in">

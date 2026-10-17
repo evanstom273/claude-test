@@ -13,11 +13,12 @@ A folk-horror metroidvania-soulslike told as a cut-paper storybook. Everything i
 | Strike (chain up to 3) | J, left click | X / RB |
 | Heavy | K, right click | Y / RT |
 | Roll | Shift, L | B |
+| Lock on | Tab, middle click | R3 |
 | Drink honey | F, Q | LB |
 | Rest at shrine | E | D-pad up |
 | Pause | Esc, P | Start |
 
-On touch devices on-screen buttons appear. `H` toggles hitboxes.
+On touch devices a floating analogue joystick (left side) and buttons appear. `H` toggles hitboxes.
 
 ## Development
 

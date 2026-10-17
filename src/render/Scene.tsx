@@ -31,6 +31,23 @@ function ParticleView({ p }: { p: Particle }) {
   }
 }
 
+/** A red-ink sigil that circles the locked-on target. */
+function LockMark({ x, y, t }: { x: number; y: number; t: number }) {
+  const pulse = 1 + Math.sin(t * 5) * 0.06
+  return (
+    <g transform={`translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${pulse.toFixed(3)})`} pointerEvents="none">
+      <g transform={`rotate(${((t * 40) % 360).toFixed(1)})`}>
+        <circle r={22} fill="none" stroke="#0b0507" strokeWidth={4} strokeDasharray="10 7" transform="translate(1.5 2)" opacity={0.6} />
+        <circle r={22} fill="none" stroke="#b3262c" strokeWidth={3} strokeDasharray="10 7" />
+      </g>
+      {[0, 90, 180, 270].map((a) => (
+        <path key={a} transform={`rotate(${a})`} d="M0 -34 L5 -26 L-5 -26Z" fill="#e9dcc0" stroke="#0b0507" strokeWidth={1} />
+      ))}
+      <circle r={3} fill="#e9dcc0" />
+    </g>
+  )
+}
+
 const DebugBox = ({ r, color }: { r: Rect; color: string }) => <rect x={r.x} y={r.y} width={r.w} height={r.h} fill={color} fillOpacity={0.15} stroke={color} strokeWidth={1.5} />
 
 export function Scene({ w }: { w: World }) {
@@ -117,6 +134,7 @@ export function Scene({ w }: { w: World }) {
           ))}
           <ScarecrowPuppet e={e} pose={enemyPose(e, t)} time={t} />
           <PlayerPuppet p={p} pose={playerPose(p, t)} time={t} />
+          {p.lockOn && e.state !== 'dead' && <LockMark x={e.body.x} y={e.body.y - e.body.h * 0.62} t={t} />}
           {w.particles.map((q, i) => (
             <ParticleView key={i} p={q} />
           ))}
