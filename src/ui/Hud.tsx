@@ -1,3 +1,4 @@
+import { RITES } from '../game/rites'
 import type { World } from '../game/types'
 
 function Bar({ value, max, width, color, back, height = 12 }: { value: number; max: number; width: number; color: string; back: string; height?: number }) {
@@ -23,6 +24,28 @@ function Jar({ full }: { full: boolean }) {
   )
 }
 
+function RiteCard({ rite, tallow }: { rite: number; tallow: number }) {
+  const r = RITES[rite]
+  const ok = tallow >= r.cost
+  return (
+    <div className="rite-card flex items-center gap-2 px-2 py-1" key={r.id}>
+      <svg width={18} height={18} viewBox="-9 -9 18 18">
+        <circle r={8} fill={r.color} opacity={ok ? 0.35 : 0.12} />
+        <circle r={4} fill={ok ? r.color : '#5a5048'} />
+      </svg>
+      <div className="leading-none">
+        <div className={`font-fell text-[15px] ${ok ? 'text-[#2a1418]' : 'text-[#2a1418]/45'}`}>{r.name}</div>
+        <div className="mt-0.5 flex gap-1">
+          {RITES.map((x, i) => (
+            <span key={x.id} className="h-1 w-3" style={{ background: i === rite ? '#7a1f24' : '#2a141833' }} />
+          ))}
+          <span className="ml-1 font-fell text-[11px] text-[#2a1418]/60">{r.cost}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function Hud({ w }: { w: World }) {
   const p = w.player
   const e = w.enemy
@@ -33,10 +56,14 @@ export function Hud({ w }: { w: World }) {
         <div className="space-y-1.5">
           <Bar value={p.hp} max={p.maxHp} width={p.maxHp * 2.4} color="#9b2c2c" back="#2a1418" height={13} />
           <Bar value={Math.max(0, p.stamina)} max={p.maxStamina} width={p.maxStamina * 1.9} color="#c9a24a" back="#2a2014" height={8} />
-          <div className="flex gap-1 pt-1">
-            {Array.from({ length: p.maxFlasks }, (_, i) => (
-              <Jar key={i} full={i < p.flasks} />
-            ))}
+          <Bar value={p.tallow} max={p.maxTallow} width={p.maxTallow * 1.7} color="#7fb8a4" back="#142420" height={8} />
+          <div className="flex items-end gap-3 pt-1">
+            <div className="flex gap-1">
+              {Array.from({ length: p.maxFlasks }, (_, i) => (
+                <Jar key={i} full={i < p.flasks} />
+              ))}
+            </div>
+            <RiteCard rite={p.rite} tallow={p.tallow} />
           </div>
         </div>
       </div>

@@ -100,7 +100,9 @@ export function TouchControls({ input, canRest, locked }: { input: InputState; c
         <Btn input={input} action="lock" label="Lock on" className="h-12 w-full text-xs" active={locked}>
           Lock
         </Btn>
-        <div />
+        <Btn input={input} action="rite" label="Change rite" className="h-12 w-full text-xs">
+          Rite
+        </Btn>
         <Btn input={input} action="roll" label="Roll" className="h-16 w-16 text-sm">
           Roll
         </Btn>
@@ -110,7 +112,10 @@ export function TouchControls({ input, canRest, locked }: { input: InputState; c
         <Btn input={input} action="jump" label="Jump" className="h-16 w-16 text-sm">
           Jump
         </Btn>
-        <Btn input={input} action="light" label="Light attack" className="col-span-3 h-16 w-full text-base">
+        <Btn input={input} action="cast" label="Cast rite" className="h-16 w-full text-sm">
+          Cast
+        </Btn>
+        <Btn input={input} action="light" label="Light attack" className="col-span-2 h-16 w-full text-base">
           Strike
         </Btn>
       </div>

@@ -2,6 +2,7 @@ import type { InputState } from './input'
 import { LEVEL } from './level'
 import { emit } from './particles'
 import { groundProbe, moveBody } from './physics'
+import { releaseRite, RITES, TALLOW } from './rites'
 import type { AttackId, Player, Rect, World } from './types'
 
 export const P = {
@@ -45,10 +46,10 @@ export interface AttackDef {
 }
 
 export const ATTACKS: Record<AttackId, AttackDef> = {
-  light1: { startup: 0.13, active: 0.09, recovery: 0.27, dmg: 20, poise: 14, stam: 16, lunge: 170, box: { x: 4, y: -84, w: 104, h: 70 }, hitstop: 0.06, shake: 4, next: 'light2', rollCancel: 0.4 },
-  light2: { startup: 0.11, active: 0.09, recovery: 0.27, dmg: 20, poise: 14, stam: 16, lunge: 170, box: { x: 4, y: -96, w: 104, h: 84 }, hitstop: 0.06, shake: 4, next: 'light3', rollCancel: 0.4 },
-  light3: { startup: 0.24, active: 0.11, recovery: 0.42, dmg: 34, poise: 28, stam: 22, lunge: 260, box: { x: 0, y: -128, w: 122, h: 128 }, hitstop: 0.09, shake: 7, rollCancel: 0.55 },
-  heavy: { startup: 0.46, active: 0.12, recovery: 0.5, dmg: 54, poise: 48, stam: 30, lunge: 210, box: { x: -6, y: -150, w: 140, h: 150 }, hitstop: 0.13, shake: 11, rollCancel: 0.6 },
+  light1: { startup: 0.13, active: 0.09, recovery: 0.27, dmg: 20, poise: 14, stam: 16, lunge: 90, box: { x: 4, y: -84, w: 104, h: 70 }, hitstop: 0.06, shake: 4, next: 'light2', rollCancel: 0.4 },
+  light2: { startup: 0.11, active: 0.09, recovery: 0.27, dmg: 20, poise: 14, stam: 16, lunge: 90, box: { x: 4, y: -96, w: 104, h: 84 }, hitstop: 0.06, shake: 4, next: 'light3', rollCancel: 0.4 },
+  light3: { startup: 0.24, active: 0.11, recovery: 0.42, dmg: 34, poise: 28, stam: 22, lunge: 150, box: { x: 0, y: -128, w: 122, h: 128 }, hitstop: 0.09, shake: 7, rollCancel: 0.55 },
+  heavy: { startup: 0.46, active: 0.12, recovery: 0.5, dmg: 54, poise: 48, stam: 30, lunge: 120, box: { x: -6, y: -150, w: 140, h: 150 }, hitstop: 0.13, shake: 11, rollCancel: 0.6 },
   air: { startup: 0.09, active: 0.16, recovery: 0.22, dmg: 18, poise: 10, stam: 14, lunge: 0, box: { x: -10, y: -96, w: 116, h: 100 }, hitstop: 0.05, shake: 3, rollCancel: 1 },
 }
 
@@ -78,6 +79,11 @@ export function createPlayer(): Player {
     dropT: 0,
     lockOn: false,
     rollDir: 1,
+    tallow: 100,
+    maxTallow: 100,
+    rite: 0,
+    cast: null,
+    castDone: false,
   }
 }
 
@@ -116,6 +122,29 @@ function startAttack(w: World, p: Player, id: AttackId, input: InputState) {
   return true
 }
 
+function tryCast(w: World, p: Player, input: InputState) {
+  if (!input.take('cast')) return false
+  const r = RITES[p.rite]
+  if (p.tallow < r.cost) {
+    w.events.push({ type: 'noTallow' })
+    return false
+  }
+  if (p.stamina <= 0) {
+    w.events.push({ type: 'noStamina' })
+    return false
+  }
+  const d = input.dir()
+  if (p.lockOn) p.facing = w.enemy.body.x >= p.body.x ? 1 : -1
+  else if (d) p.facing = d > 0 ? 1 : -1
+  p.tallow -= r.cost
+  spend(p, r.stam)
+  p.cast = r.id
+  p.castDone = false
+  p.attack = null
+  setState(p, 'cast')
+  return true
+}
+
 function tryRoll(w: World, p: Player, input: InputState) {
   if (!p.body.onGround) return false
   if (!input.take('roll')) return false
@@ -145,6 +174,7 @@ export function hurtPlayer(w: World, p: Player, dmg: number, fromX: number) {
   if (p.state === 'dead') return
   p.hp -= dmg
   p.attack = null
+  p.cast = null
   p.body.h = P.height
   const dir = p.body.x < fromX ? -1 : 1
   p.body.vx = dir * 330
@@ -163,6 +193,12 @@ export function updatePlayer(w: World, p: Player, input: InputState, dt: number)
   p.t += dt
   p.invuln = Math.max(0, p.invuln - dt)
   p.landT = Math.max(0, p.landT - dt)
+
+  if (input.take('rite') && p.state !== 'dead') {
+    p.rite = (p.rite + 1) % RITES.length
+    w.events.push({ type: 'riteSwap' })
+  }
+  if (p.state !== 'cast' && p.state !== 'dead') p.tallow = Math.min(p.maxTallow, p.tallow + TALLOW.regen * dt)
 
   // stamina
   if (p.stamDelay > 0) p.stamDelay -= dt
@@ -210,6 +246,7 @@ export function updatePlayer(w: World, p: Player, input: InputState, dt: number)
       if (b.vy >= 0) p.jumping = false
 
       if (tryRoll(w, p, input)) break
+      if (b.onGround && tryCast(w, p, input)) break
       if (input.take('light')) {
         if (startAttack(w, p, b.onGround ? 'light1' : 'air', input)) break
       }
@@ -271,6 +308,23 @@ export function updatePlayer(w: World, p: Player, input: InputState, dt: number)
           p.attack = null
           setState(p, 'move')
         }
+      }
+      break
+    }
+    case 'cast': {
+      const r = RITES.find((x) => x.id === p.cast)!
+      control = 0
+      b.vx *= Math.exp(-12 * dt)
+      if (!p.castDone && p.t >= r.release) {
+        p.castDone = true
+        releaseRite(w, p)
+        w.events.push({ type: 'cast', rite: r.id })
+      }
+      if (p.t >= r.total) {
+        p.cast = null
+        setState(p, 'move')
+      } else if (p.castDone && p.t >= r.release + (r.total - r.release) * 0.5 && input.peek('roll', 200) && tryRoll(w, p, input)) {
+        p.cast = null
       }
       break
     }
@@ -344,6 +398,8 @@ function onOneWay(b: Player['body']) {
 
 export function restPlayer(p: Player) {
   p.lockOn = false
+  p.tallow = p.maxTallow
+  p.cast = null
   p.hp = p.maxHp
   p.flasks = p.maxFlasks
   p.stamina = p.maxStamina

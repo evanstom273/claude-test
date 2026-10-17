@@ -1,4 +1,4 @@
-export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'roll' | 'heal' | 'interact' | 'lock' | 'pause'
+export type Action = 'left' | 'right' | 'up' | 'down' | 'jump' | 'light' | 'heavy' | 'roll' | 'heal' | 'interact' | 'lock' | 'cast' | 'rite' | 'pause'
 
 const KEYS: Record<string, Action> = {
   ArrowLeft: 'left',
@@ -16,7 +16,10 @@ const KEYS: Record<string, Action> = {
   ShiftRight: 'roll',
   KeyL: 'roll',
   KeyF: 'heal',
-  KeyQ: 'heal',
+  KeyI: 'cast',
+  KeyC: 'cast',
+  KeyQ: 'rite',
+  KeyR: 'rite',
   KeyE: 'interact',
   Tab: 'lock',
   Escape: 'pause',
@@ -34,10 +37,11 @@ const PAD: [number, Action][] = [
   [7, 'heavy'],
   [9, 'pause'],
   [11, 'lock'],
-  [12, 'interact'],
+  [6, 'cast'],
+  [12, 'rite'],
   [14, 'left'],
   [15, 'right'],
-  [13, 'down'],
+  [13, 'interact'],
 ]
 
 /**
@@ -140,6 +144,10 @@ export class InputState {
       if (e.button === 2) this.set('mouse', 'heavy', false)
     }
     const cm = (e: Event) => e.preventDefault()
+    const wheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) > 4) this.press('rite')
+    }
+    window.addEventListener('wheel', wheel, { passive: true })
     const blur = () => this.sources.clear()
     window.addEventListener('keydown', kd)
     window.addEventListener('keyup', ku)
@@ -154,6 +162,7 @@ export class InputState {
       window.removeEventListener('mouseup', mu)
       window.removeEventListener('contextmenu', cm)
       window.removeEventListener('blur', blur)
+      window.removeEventListener('wheel', wheel)
     }
   }
 
