@@ -17,8 +17,8 @@ function fitView(w: World) {
     w.view.h = VIEW_H
     w.view.w = VIEW_H * aspect
   } else {
-    w.view.w = 820
-    w.view.h = 820 / aspect
+    w.view.w = 1000
+    w.view.h = 1000 / aspect
   }
 }
 
@@ -108,7 +108,22 @@ export function Game({ onQuit }: { onQuit: () => void }) {
               setBanner({ kind: 'rest', at: now })
               break
             case 'tele':
-              sfx.tele()
+              sfx.tele(ev.move)
+              break
+            case 'cast':
+              sfx.cast(ev.rite)
+              break
+            case 'thorns':
+              sfx.thorns()
+              break
+            case 'crow':
+              sfx.crow()
+              break
+            case 'riteSwap':
+              sfx.riteSwap()
+              break
+            case 'noTallow':
+              sfx.noTallow()
               break
             case 'enemyStrike':
               sfx.enemyStrike()
@@ -257,9 +272,11 @@ function PauseMenu({ muted, debug, onResume, onMute, onDebug, onQuit }: { muted:
     ['Heavy', 'K · right click'],
     ['Roll', 'Shift · L'],
     ['Lock on', 'Tab · middle click'],
-    ['Drink honey', 'F · Q'],
+    ['Cast rite', 'I · C (tallow refills slowly, faster with scythe hits)'],
+    ['Change rite', 'Q · R · mouse wheel'],
+    ['Drink honey', 'F'],
     ['Rest', 'E at the shrine'],
-    ['Gamepad', 'A jump · B roll · X strike · Y heavy · LB heal · R3 lock on'],
+    ['Gamepad', 'A jump · B roll · X strike · Y heavy · LT cast · D-pad up rite · LB heal · R3 lock on'],
   ]
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-[#0b0507]/75 p-4 backdrop-blur-[2px] fade-in">

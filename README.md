@@ -2,7 +2,7 @@
 
 A folk-horror metroidvania-soulslike told as a cut-paper storybook. Everything is drawn in SVG; the characters are jointed paper puppets held together with brass split-pins.
 
-**Current stage: feel prototype.** One field, the farmhand and her scythe, one scarecrow (The Tattered Man), and a shrine to rest at. The point is to get the combat feeling right before building the world on top of it.
+**Current stage: feel prototype.** One field, the farmhand with her scythe and four hedge-witch rites (paid for in candle tallow), one scarecrow (The Tattered Man), and a shrine to rest at. The point is to get the combat feeling right before building the world on top of it.
 
 ## Controls
 
@@ -14,8 +14,10 @@ A folk-horror metroidvania-soulslike told as a cut-paper storybook. Everything i
 | Heavy | K, right click | Y / RT |
 | Roll | Shift, L | B |
 | Lock on | Tab, middle click | R3 |
-| Drink honey | F, Q | LB |
-| Rest at shrine | E | D-pad up |
+| Cast rite | I, C | LT |
+| Change rite | Q, R, mouse wheel | D-pad up |
+| Drink honey | F | LB |
+| Rest at shrine | E | D-pad down |
 | Pause | Esc, P | Start |
 
 On touch devices a floating analogue joystick (left side) and buttons appear. `H` toggles hitboxes.

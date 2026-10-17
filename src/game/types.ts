@@ -23,7 +23,8 @@ export interface Body {
   onGround: boolean
 }
 
-export type PlayerState = 'move' | 'roll' | 'attack' | 'hurt' | 'heal' | 'rest' | 'dead'
+export type PlayerState = 'move' | 'roll' | 'attack' | 'cast' | 'hurt' | 'heal' | 'rest' | 'dead'
+export type RiteId = 'wisp' | 'husk' | 'briar' | 'moon'
 export type AttackId = 'light1' | 'light2' | 'light3' | 'heavy' | 'air'
 
 export interface Player {
@@ -52,9 +53,14 @@ export interface Player {
   dropT: number
   lockOn: boolean
   rollDir: 1 | -1
+  tallow: number
+  maxTallow: number
+  rite: number
+  cast: RiteId | null
+  castDone: boolean
 }
 
-export type EnemyMoveId = 'lunge' | 'swipes' | 'leap' | 'overhead' | 'backstep'
+export type EnemyMoveId = 'lunge' | 'swipes' | 'leap' | 'overhead' | 'crows' | 'backstep'
 export type EnemyState = 'dormant' | 'stalk' | 'move' | 'stagger' | 'dead'
 
 export interface Enemy {
@@ -81,6 +87,9 @@ export interface Enemy {
   walkPhase: number
   spawnX: number
   spawnY: number
+  /** Where a leap will land, shown as a shadow on the ground. */
+  landX: number | null
+  crowsSent: number
 }
 
 export interface Particle {
@@ -96,6 +105,38 @@ export interface Particle {
   color: string
   kind: 'straw' | 'ink' | 'scrap' | 'dust' | 'spark'
   gravity: number
+}
+
+export interface Projectile {
+  kind: 'wisp' | 'moon' | 'crow'
+  x: number
+  y: number
+  vx: number
+  vy: number
+  age: number
+  life: number
+  dmg: number
+  poise: number
+  /** Half-size of the hit area. */
+  rx: number
+  ry: number
+  hostile: boolean
+  hit: boolean
+}
+
+/** A delayed area effect: thorns that erupt after a tell, or a gout of flame. */
+export interface Hazard {
+  kind: 'briar' | 'flame'
+  x: number
+  y: number
+  dir: 1 | -1
+  t: number
+  delay: number
+  dur: number
+  dmg: number
+  poise: number
+  box: Rect
+  hit: boolean
 }
 
 export interface Splat {
@@ -125,6 +166,11 @@ export type GameEvent =
   | { type: 'death' }
   | { type: 'noStamina' }
   | { type: 'lock'; on: boolean }
+  | { type: 'cast'; rite: RiteId }
+  | { type: 'riteSwap' }
+  | { type: 'noTallow' }
+  | { type: 'crow' }
+  | { type: 'thorns' }
 
 export interface World {
   time: number
@@ -133,6 +179,8 @@ export interface World {
   player: Player
   enemy: Enemy
   particles: Particle[]
+  projectiles: Projectile[]
+  hazards: Hazard[]
   splats: Splat[]
   cam: { x: number; y: number }
   view: { w: number; h: number }

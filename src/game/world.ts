@@ -3,11 +3,12 @@ import type { InputState } from './input'
 import { GROUND_Y, LEVEL } from './level'
 import { emit, inkSplat, updateParticles } from './particles'
 import { bodyRect, overlaps, worldBox } from './physics'
+import { TALLOW, updateRites } from './rites'
 import { attackPhase, createPlayer, hurtPlayer, respawnPlayer, restPlayer, updatePlayer } from './player'
 import type { World } from './types'
 
 export const STEP = 1 / 120
-export const VIEW_H = 640
+export const VIEW_H = 800
 
 export function createWorld(): World {
   return {
@@ -17,6 +18,8 @@ export function createWorld(): World {
     player: createPlayer(),
     enemy: createEnemy(),
     particles: [],
+    projectiles: [],
+    hazards: [],
     splats: [],
     cam: { x: LEVEL.playerSpawn.x, y: GROUND_Y - VIEW_H * 0.7 },
     view: { w: 1100, h: VIEW_H },
@@ -32,6 +35,8 @@ export function nearShrine(w: World) {
 }
 
 export function rest(w: World) {
+  w.projectiles = []
+  w.hazards = []
   restPlayer(w.player)
   resetEnemy(w.enemy)
   w.events.push({ type: 'rest' })
@@ -51,6 +56,8 @@ export function respawn(w: World) {
   respawnPlayer(w.player)
   resetEnemy(w.enemy)
   w.particles = []
+  w.projectiles = []
+  w.hazards = []
   w.cam.x = w.player.body.x
 }
 
@@ -69,6 +76,8 @@ function combat(w: World) {
       w.freeze = ph.a.hitstop * (crit ? 1.6 : 1)
       w.shake = Math.max(w.shake, ph.a.shake * (crit ? 1.5 : 1))
       w.events.push({ type: 'hit', heavy, crit })
+      // the scythe feeds the candle: melee hits restore tallow
+      p.tallow = Math.min(p.maxTallow, p.tallow + TALLOW.perHit * (heavy ? 1.5 : 1))
       const hx = (Math.max(box.x, e.body.x - e.body.w / 2) + Math.min(box.x + box.w, e.body.x + e.body.w / 2)) / 2
       const hy = Math.max(box.y, e.body.y - e.body.h) + 40
       inkSplat(w, hx, hy, p.facing === 1 ? -0.3 : Math.PI + 0.3, heavy || crit)
@@ -105,6 +114,7 @@ export function step(w: World, input: InputState) {
   updatePlayer(w, w.player, input, STEP)
   updateEnemy(w, w.enemy, STEP)
   combat(w)
+  updateRites(w, STEP)
   updateParticles(w, STEP, GROUND_Y)
   w.shake = Math.max(0, w.shake - STEP * 40)
   if (w.enemy.state === 'dead' && w.enemy.t === STEP) w.kills++

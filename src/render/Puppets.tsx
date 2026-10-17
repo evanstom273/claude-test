@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import type { Enemy, Player } from '../game/types'
-import { currentSeg } from '../game/enemy'
+import { currentSeg, MOVE_EYE } from '../game/enemy'
+import { attackPhase } from '../game/player'
+import { RITES } from '../game/rites'
 import type { Pose } from './pose'
 
 /** Brass split-pin, the joint of a paper puppet. */
@@ -15,6 +17,43 @@ const Pin = ({ x = 0, y = 0, r = 1.9 }: { x?: number; y?: number; r?: number }) 
 const Seg = ({ x = 0, y = 0, a, children }: { x?: number; y?: number; a: number; children: ReactNode }) => (
   <g transform={`translate(${x} ${y}) rotate(${(-a).toFixed(1)})`}>{children}</g>
 )
+
+// --------------------------------------------------------- swing smears
+
+/**
+ * A pale paper crescent drawn along the path of a swing, so every strike
+ * reads as one clear shape instead of a blur of limbs.
+ */
+const SWOOSH: Record<string, string> = {
+  // player, local to the hip, facing right
+  light1: 'M-10 -30 Q60 -40 98 6 Q70 -18 -6 -18Z',
+  light2: 'M70 30 Q96 -40 30 -88 Q72 -40 56 22Z',
+  light3: 'M-10 -96 Q90 -100 104 40 Q74 -60 -4 -80Z',
+  heavy: 'M-24 -110 Q110 -120 120 50 Q84 -66 -16 -92Z',
+  air: 'M-6 -80 Q92 -70 80 40 Q62 -40 -2 -64Z',
+  // the Tattered Man, local to his feet
+  lungeAct: 'M-20 -120 Q90 -140 170 -90 Q90 -110 -10 -100Z',
+  swipe1: 'M40 -230 Q150 -170 120 -20 Q120 -150 34 -210Z',
+  swipe2: 'M30 -40 Q150 -60 150 -200 Q130 -80 26 -60Z',
+  ohStrike: 'M-10 -260 Q150 -250 150 -10 Q120 -200 -6 -236Z',
+  leapLand: 'M-150 -6 Q0 -60 150 -6 Q0 -36 -150 -6Z',
+}
+
+function PlayerSwoosh({ p, hipY }: { p: Player; hipY: number }) {
+  if (p.state !== 'attack' || !p.attack) return null
+  const ph = attackPhase(p)
+  if (!ph || ph.phase === 'startup') return null
+  const k = ph.phase === 'active' ? 0 : ph.k
+  if (k > 0.35) return null
+  const o = 0.75 * (1 - k / 0.35)
+  return <path d={SWOOSH[p.attack]} transform={`translate(0 ${hipY.toFixed(1)})`} fill="#f4ecd6" opacity={o} />
+}
+
+function EnemySwoosh({ pose, k }: { pose: string; k: number }) {
+  const d = SWOOSH[pose]
+  if (!d) return null
+  return <path d={d} fill="#e9dcc0" opacity={0.7 * (1 - k * 0.6)} />
+}
 
 // ------------------------------------------------------------------ player
 
@@ -79,6 +118,7 @@ export function PlayerPuppet({ p, pose, time }: { p: Player; pose: Pose; time: n
   const b = p.body
   const hipY = -46 + pose.crouch + pose.bob
   const blink = p.invuln > 0 && p.state === 'hurt' ? Math.floor(time * 30) % 2 === 0 : false
+  const castColor = p.state === 'cast' && p.cast !== 'moon' ? RITES.find((r) => r.id === p.cast)?.color : undefined
   const scarf = Math.sin(time * 9) * 6 - Math.min(18, Math.abs(b.vx) * 0.05)
   const torso = (children: ReactNode) => (
     <g transform={`translate(0 ${hipY.toFixed(1)}) rotate(${pose.lean.toFixed(1)})`}>{children}</g>
@@ -95,12 +135,20 @@ export function PlayerPuppet({ p, pose, time }: { p: Player; pose: Pose; time: n
             <g transform={`translate(-1 ${-PL.torso + 4})`}>
               <PlayerArm upper={pose.armB} fore={pose.foreB} back>
                 {p.state === 'heal' && <HoneyJar />}
+                {castColor && (
+                  <g>
+                    <circle r={13} fill={castColor} opacity={0.25} />
+                    <circle r={6} fill={castColor} opacity={0.8} />
+                    <circle r={2.5} fill="#fff" />
+                  </g>
+                )}
               </PlayerArm>
             </g>,
           )}
           <g transform={`translate(3 ${hipY.toFixed(1)})`}>
             <PlayerLeg thigh={pose.legF} shin={pose.shinF} />
           </g>
+          <PlayerSwoosh p={p} hipY={hipY} />
           {torso(
             <>
               {/* smock */}
@@ -199,8 +247,11 @@ export function ScarecrowPuppet({ e, pose, time }: { e: Enemy; pose: Pose; time:
   const b = e.body
   const hipY = -82 + pose.crouch + pose.bob
   const seg = currentSeg(e)
-  const tele = e.state === 'move' && seg?.kind === 'tele'
-  const glow = tele ? 1 : e.state === 'dormant' ? 0.15 : 0.5
+  const tele = e.state === 'move' && (seg?.kind === 'tele' || (e.move === 'crows' && seg?.kind === 'act'))
+  const glow = tele ? 1 : e.state === 'dormant' ? 0.15 : 0.45
+  const eye = e.move && tele ? MOVE_EYE[e.move] : '#ff6a1a'
+  // the delayed overhead trembles as a whole body; limbs stay locked
+  const tremble = seg?.pose === 'ohHold' ? Math.sin(time * 55) * 1.6 : 0
   const fade = e.state === 'dead' ? Math.max(0, 1 - Math.max(0, e.t - 1.4) / 1.2) : 1
   const wob = e.wobble > 0 ? Math.sin(time * 90) * e.wobble * 4 : 0
   const coatFlap = Math.sin(time * 3.1) * 3
@@ -209,12 +260,13 @@ export function ScarecrowPuppet({ e, pose, time }: { e: Enemy; pose: Pose; time:
   )
   if (fade <= 0) return null
   return (
-    <g transform={`translate(${(b.x + wob).toFixed(1)} ${b.y.toFixed(1)})`} opacity={fade}>
+    <g transform={`translate(${(b.x + wob + tremble).toFixed(1)} ${b.y.toFixed(1)})`} opacity={fade}>
       <ellipse cx={0} cy={1} rx={34} ry={5} fill="#000" opacity={0.35} />
       <g transform={`scale(${e.facing} 1)`} filter="url(#paperShadow)" style={e.flash > 0 ? { filter: 'url(#paperShadow) brightness(2.4)' } : undefined}>
         <g transform={`translate(-5 ${hipY.toFixed(1)})`}>
           <PoleLeg thigh={pose.legB} shin={pose.shinB} back />
         </g>
+        {seg?.kind === 'act' && <EnemySwoosh pose={seg.pose} k={e.segT / Math.max(0.001, e.segDur)} />}
         {torso(
           <g transform={`translate(-6 ${-SC.torso + 6})`}>
             <RagArm upper={pose.armB} fore={pose.foreB} back />
@@ -246,11 +298,11 @@ export function ScarecrowPuppet({ e, pose, time }: { e: Enemy; pose: Pose; time:
               <path d="M-10 -6 L-6 -2 L-2 -6 L2 -2 L6 -6 L10 -2 L13 -6" stroke="#1a0d10" strokeWidth={1.5} fill="none" strokeLinecap="round" />
               <path d="M-10 -8 L13 -8" stroke="#1a0d10" strokeWidth={1} strokeDasharray="2 2" />
               {/* eyes: stitched crosses that kindle when he winds up */}
-              <circle cx={1} cy={-24} r={9} fill="#ff6a1a" opacity={glow * 0.25} />
-              <circle cx={14} cy={-25} r={8} fill="#ff6a1a" opacity={glow * 0.25} />
+              <circle cx={1} cy={-24} r={tele ? 13 : 9} fill={eye} opacity={glow * 0.3} />
+              <circle cx={14} cy={-25} r={tele ? 12 : 8} fill={eye} opacity={glow * 0.3} />
               <path d="M-3 -28 L5 -20 M5 -28 L-3 -20 M10 -29 L18 -21 M18 -29 L10 -21" stroke="#1a0d10" strokeWidth={2.4} strokeLinecap="round" />
-              <circle cx={1} cy={-24} r={2.4} fill="#ffb347" opacity={glow} />
-              <circle cx={14} cy={-25} r={2.2} fill="#ffb347" opacity={glow} />
+              <circle cx={1} cy={-24} r={tele ? 3.4 : 2.4} fill={tele ? eye : '#ffb347'} opacity={glow} />
+              <circle cx={14} cy={-25} r={tele ? 3.2 : 2.2} fill={tele ? eye : '#ffb347'} opacity={glow} />
               {/* crooked hat */}
               <path d="M-30 -36 Q-2 -48 30 -40 Q4 -34 -30 -36Z" fill="#241b26" />
               <path d="M-14 -40 Q-16 -60 -2 -72 Q2 -62 12 -66 Q10 -54 16 -42Z" fill="#2e2432" />

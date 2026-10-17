@@ -3,7 +3,7 @@ import { GROUND_Y, LEVEL } from '../game/level'
 import { blob, deadTree, hills, rng, tornShape } from './paper'
 
 /** Camera y the layers are composed for; parallax shifts relative to this. */
-export const REF_CAM_Y = GROUND_Y + 120 - 640
+export const REF_CAM_Y = GROUND_Y + 120 - 800
 
 const SPAN = LEVEL.width + 2400
 
@@ -77,7 +77,7 @@ export const CloudLayer = memo(function CloudLayer() {
 
 export const FarLayer = memo(function FarLayer() {
   const r = rng(12)
-  const hFar = hills(3, 40, ly(330, PARALLAX.far))
+  const hFar = hills(3, 40, ly(430, PARALLAX.far))
   return (
       <g>
         <path d={tornShape(-50, SPAN * PARALLAX.far + 2000, 1400, hFar, r, 16, 2.5)} fill="#2a141e" transform="translate(4 5)" />
@@ -90,7 +90,7 @@ export const FarLayer = memo(function FarLayer() {
 
 export const MidLayer = memo(function MidLayer() {
   const r = rng(13)
-  const hMid = hills(7, 30, ly(400, PARALLAX.mid))
+  const hMid = hills(7, 30, ly(510, PARALLAX.mid))
   const midTrees: string[] = []
   for (let x = 0; x < SPAN; x += 160 + r() * 260) midTrees.push(deadTree(x, hMid(x) + 6, 120 + r() * 80, r))
   return (
@@ -106,7 +106,7 @@ export const MidLayer = memo(function MidLayer() {
 export const NearLayer = memo(function NearLayer() {
   const r = rng(23)
   const f = PARALLAX.near
-  const base = ly(470, f)
+  const base = ly(595, f)
   const trees: { d: string; x: number }[] = []
   for (let x = 40; x < SPAN * f + 1200; x += 240 + r() * 300) trees.push({ d: deadTree(x, base + 160, 200 + r() * 120, r), x })
   const posts: number[] = []
@@ -238,7 +238,7 @@ export const WorldStatic = memo(function WorldStatic() {
 export const Foreground = memo(function Foreground() {
   const r = rng(91)
   const f = PARALLAX.fore
-  const base = ly(650, f)
+  const base = ly(815, f)
   const stalks: string[] = []
   const heads: string[] = []
   for (let x = -100; x < SPAN * f; x += 60 + r() * 160) {

@@ -132,10 +132,58 @@ export const sfx = {
   rest() {
     ;[196, 247, 294, 392].forEach((f, i) => tone(f, 1.8, 'triangle', 0.1, undefined, i * 0.18))
   },
-  tele() {
-    // a rasping intake of breath through burlap
-    noise(0.5, 0.18, 'bandpass', 300, 1600, 3)
-    tone(70, 0.5, 'sawtooth', 0.08, 110)
+  /** Each attack has its own wind-up sound, so you can learn them by ear. */
+  tele(move: string) {
+    switch (move) {
+      case 'lunge': // a rasping intake of breath through burlap
+        noise(0.6, 0.2, 'bandpass', 300, 1600, 3)
+        tone(70, 0.6, 'sawtooth', 0.08, 110)
+        break
+      case 'swipes': // two dry scrapes of steel
+        noise(0.14, 0.18, 'highpass', 3000, 6000, 1)
+        noise(0.14, 0.18, 'highpass', 3000, 6000, 1, 0.16)
+        break
+      case 'overhead': // a low groan that rises and stops dead
+        tone(55, 0.5, 'sawtooth', 0.12, 90)
+        noise(0.5, 0.12, 'lowpass', 400, 900, 1)
+        break
+      case 'leap': // creaking wood under strain
+        tone(140, 0.7, 'square', 0.05, 60)
+        noise(0.7, 0.12, 'bandpass', 600, 200, 4)
+        break
+      case 'crows': // a harsh caw
+        tone(820, 0.18, 'sawtooth', 0.08, 520)
+        tone(760, 0.22, 'sawtooth', 0.08, 480, 0.22)
+        break
+    }
+  },
+  cast(rite: string) {
+    if (rite === 'wisp') {
+      tone(880, 0.25, 'sine', 0.1, 1320)
+      tone(1320, 0.2, 'sine', 0.05, 1760, 0.05)
+    } else if (rite === 'husk') {
+      noise(0.45, 0.4, 'bandpass', 800, 300, 0.7)
+      tone(110, 0.3, 'sawtooth', 0.08, 60)
+    } else if (rite === 'briar') {
+      tone(220, 0.3, 'triangle', 0.1, 110)
+    } else {
+      noise(0.5, 0.3, 'bandpass', 2400, 600, 2)
+      tone(660, 0.6, 'triangle', 0.12, 330)
+    }
+  },
+  thorns() {
+    noise(0.3, 0.4, 'lowpass', 1400, 200, 1)
+    tone(90, 0.25, 'square', 0.08, 50)
+  },
+  crow() {
+    tone(900 + Math.random() * 200, 0.12, 'sawtooth', 0.06, 600)
+    noise(0.2, 0.12, 'highpass', 2000, 4000, 1)
+  },
+  riteSwap() {
+    tone(520, 0.06, 'triangle', 0.06, 640)
+  },
+  noTallow() {
+    tone(200, 0.12, 'sine', 0.06, 150)
   },
   enemyStrike() {
     noise(0.22, 0.3, 'bandpass', 900, 3200, 1.2)
