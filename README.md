@@ -22,6 +22,10 @@ A folk-horror metroidvania-soulslike told as a cut-paper storybook. Everything i
 
 On touch devices a floating analogue joystick (left side) and buttons appear. `H` toggles hitboxes.
 
+## The farmstead (isometric experiment)
+
+From the title screen, *Or look down on the farmstead* opens a Project Zomboid / Sims 1 style isometric take on the same fight: a cottage whose walls drop when you go inside, a pumpkin patch, a pond, two cornfields that fade as you walk behind them, and several scarecrows on posts. One of them is the Tattered Man. Move in 8 directions with WASD or the stick; Space rolls; everything else matches the side view.
+
 ## Development
 
 ```sh

@@ -7,7 +7,7 @@ import { Scene } from '../render/Scene'
 import { Hud } from './Hud'
 import { TouchControls } from './TouchControls'
 
-type Banner = { kind: 'chapter' | 'death' | 'harvested' | 'rest'; at: number }
+export type Banner = { kind: 'chapter' | 'death' | 'harvested' | 'rest'; at: number }
 
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches
 
@@ -180,7 +180,7 @@ export function Game({ onQuit }: { onQuit: () => void }) {
       <Scene w={w} />
       <div className="paper-grain pointer-events-none fixed inset-0" />
       <div className="vignette pointer-events-none fixed inset-0" />
-      <Hud w={w} />
+      <Hud p={w.player} e={w.enemy} />
 
       {canRest && !touch && (
         <div className="pointer-events-none fixed bottom-[28%] left-1/2 -translate-x-1/2 font-fell text-lg text-[#e9dcc0] drop-shadow-[2px_2px_0_#0b0507] fade-in">
@@ -221,7 +221,7 @@ export function Game({ onQuit }: { onQuit: () => void }) {
   )
 }
 
-function BannerView({ kind, age, onDone }: { kind: Banner['kind']; age: number; onDone: () => void }) {
+export function BannerView({ kind, age, onDone }: { kind: Banner['kind']; age: number; onDone: () => void }) {
   if (age < 0) return null
   const life = kind === 'death' ? 99 : kind === 'chapter' ? 4.5 : kind === 'harvested' ? 4 : 2.6
   if (age > life) {
@@ -264,8 +264,11 @@ function BannerView({ kind, age, onDone }: { kind: Banner['kind']; age: number; 
   )
 }
 
-function PauseMenu({ muted, debug, onResume, onMute, onDebug, onQuit }: { muted: boolean; debug: boolean; onResume: () => void; onMute: () => void; onDebug: () => void; onQuit: () => void }) {
-  const rows: [string, string][] = [
+export function PauseMenu({ muted, debug, onResume, onMute, onDebug, onQuit, rows = SIDE_ROWS }: { muted: boolean; debug: boolean; onResume: () => void; onMute: () => void; onDebug: () => void; onQuit: () => void; rows?: [string, string][] }) {
+  return <PauseMenuView muted={muted} debug={debug} onResume={onResume} onMute={onMute} onDebug={onDebug} onQuit={onQuit} rows={rows} />
+}
+
+const SIDE_ROWS: [string, string][] = [
     ['Move', 'A / D · ← →'],
     ['Jump', 'Space (down + jump drops through)'],
     ['Strike', 'J · left click (chain three)'],
@@ -277,7 +280,9 @@ function PauseMenu({ muted, debug, onResume, onMute, onDebug, onQuit }: { muted:
     ['Drink honey', 'F'],
     ['Rest', 'E at the shrine'],
     ['Gamepad', 'A jump · B roll · X strike · Y heavy · LT cast · D-pad up rite · LB heal · R3 lock on'],
-  ]
+]
+
+function PauseMenuView({ muted, debug, onResume, onMute, onDebug, onQuit, rows }: { muted: boolean; debug: boolean; onResume: () => void; onMute: () => void; onDebug: () => void; onQuit: () => void; rows: [string, string][] }) {
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-[#0b0507]/75 p-4 backdrop-blur-[2px] fade-in">
       <div className="page w-full max-w-lg p-6 sm:p-8">

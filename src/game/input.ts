@@ -54,8 +54,12 @@ export class InputState {
   private pressed = new Map<Action, number>()
   private padPrev = new Set<Action>()
   private padX = 0
+  private padY = 0
   /** Analog x from the touch joystick, or null when it isn't held. */
   stickX: number | null = null
+  stickY = 0
+  /** Top-down modes use the stick's vertical axis for movement, not for menus. */
+  isoMode = false
   onPause: (() => void) | null = null
 
   private set(source: string, a: Action, down: boolean) {
@@ -83,10 +87,19 @@ export class InputState {
     return (this.held('right') ? 1 : 0) - (this.held('left') ? 1 : 0)
   }
 
+  /** Vertical movement in [-1, 1], down positive: used by the isometric mode. */
+  dirY() {
+    const dz = (v: number, d: number) => (Math.abs(v) < d ? 0 : Math.sign(v) * Math.min(1, (Math.abs(v) - d) / (1 - d)))
+    if (this.stickX !== null) return dz(this.stickY, 0.15)
+    if (Math.abs(this.padY) > 0.25) return dz(this.padY, 0.25)
+    return (this.held('down') ? 1 : 0) - (this.held('up') ? 1 : 0)
+  }
+
   /** Touch joystick position, each axis in [-1, 1]; pass null on release. */
   stick(x: number | null, y = 0) {
     this.stickX = x
-    this.set('stick', 'down', x !== null && y > 0.6)
+    this.stickY = x === null ? 0 : y
+    this.set('stick', 'down', !this.isoMode && x !== null && y > 0.6)
   }
 
   held(a: Action) {
@@ -170,14 +183,16 @@ export class InputState {
     const pads = navigator.getGamepads?.() ?? []
     const now = new Set<Action>()
     this.padX = 0
+    this.padY = 0
     for (const gp of pads) {
       if (!gp) continue
       for (const [i, a] of PAD) if (gp.buttons[i]?.pressed) now.add(a)
       const ax = gp.axes[0] ?? 0
       const ay = gp.axes[1] ?? 0
       if (Math.abs(ax) > Math.abs(this.padX)) this.padX = ax
-      if (ay < -0.6) now.add('interact')
-      if (ay > 0.6) now.add('down')
+      if (Math.abs(ay) > Math.abs(this.padY)) this.padY = ay
+      if (!this.isoMode && ay < -0.6) now.add('interact')
+      if (!this.isoMode && ay > 0.6) now.add('down')
     }
     for (const a of now) if (!this.padPrev.has(a)) this.set('pad', a, true)
     for (const a of this.padPrev) if (!now.has(a)) this.set('pad', a, false)
