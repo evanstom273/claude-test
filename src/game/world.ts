@@ -38,6 +38,15 @@ export function rest(w: World) {
   emit(w, 30, LEVEL.shrine.x, LEVEL.shrine.y - 80, { kind: 'spark', colors: ['#f2c14e', '#ffe08a', '#e8a33a'], speed: 140, size: 3, life: 1.4, gravity: -120 })
 }
 
+export function toggleLock(w: World) {
+  const p = w.player
+  const e = w.enemy
+  if (p.lockOn) p.lockOn = false
+  else if (e.state !== 'dead' && p.state !== 'dead' && Math.abs(e.body.x - p.body.x) < 760) p.lockOn = true
+  else return
+  w.events.push({ type: 'lock', on: p.lockOn })
+}
+
 export function respawn(w: World) {
   respawnPlayer(w.player)
   resetEnemy(w.enemy)
@@ -102,8 +111,9 @@ export function step(w: World, input: InputState) {
 
   // camera: lead in the facing direction, settle vertically
   const p = w.player.body
-  const lead = w.player.facing * 90
-  const tx = Math.max(w.view.w / 2, Math.min(LEVEL.width - w.view.w / 2, p.x + lead))
+  // locked on, the camera frames both of you instead of leading ahead
+  const focus = w.player.lockOn ? p.x + (w.enemy.body.x - p.x) * 0.42 : p.x + w.player.facing * 90
+  const tx = Math.max(w.view.w / 2, Math.min(LEVEL.width - w.view.w / 2, focus))
   w.cam.x += (tx - w.cam.x) * (1 - Math.exp(-4 * STEP))
   const ty = Math.min(GROUND_Y + 120 - w.view.h, p.y - w.view.h * 0.62)
   w.cam.y += (ty - w.cam.y) * (1 - Math.exp(-3 * STEP))

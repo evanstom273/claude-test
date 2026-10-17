@@ -164,6 +164,9 @@ export const sfx = {
   noStamina() {
     tone(160, 0.08, 'square', 0.05)
   },
+  lock(on: boolean) {
+    tone(on ? 330 : 247, 0.12, 'triangle', 0.1, on ? 494 : 165)
+  },
   click() {
     tone(660, 0.05, 'triangle', 0.08)
   },

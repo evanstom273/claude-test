@@ -84,7 +84,8 @@ export function playerPose(p: Player, time: number): Pose {
       const tuck = mk({ lean: 60, head: 30, armF: 70, foreF: 90, tool: 100, armB: 50, foreB: 100, legF: 95, shinF: -135, legB: 75, shinB: -125 })
       const blend = k < 0.15 ? k / 0.15 : k > 0.85 ? (1 - k) / 0.15 : 1
       const pose = mix(P_IDLE, tuck, easeOut(blend))
-      pose.spin = 360 * easeInOut(k)
+      // rolling backwards while locked on tumbles the other way
+      pose.spin = 360 * easeInOut(k) * (p.rollDir === p.facing ? 1 : -1)
       return pose
     }
     case 'attack': {
