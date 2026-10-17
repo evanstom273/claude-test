@@ -1,0 +1,118 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'Cinzel', ui-serif, Georgia, serif;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: #03040a;
+  color: #fef3c7;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer components {
+  .menu-btn {
+    @apply min-w-48 rounded-full bg-gradient-to-b from-amber-300 to-orange-500 px-8 py-3 font-display text-xl font-bold tracking-[0.2em] text-[#2a1203] uppercase shadow-[0_0_30px_rgba(251,146,60,0.45)] transition hover:scale-105 hover:shadow-[0_0_45px_rgba(251,191,36,0.65)] active:scale-95;
+  }
+  .menu-btn-ghost {
+    @apply bg-none bg-transparent text-amber-100/80 shadow-none ring-1 ring-amber-100/30 hover:bg-amber-100/10 hover:shadow-none;
+  }
+  .hud-btn {
+    @apply grid h-10 w-10 place-items-center rounded-full bg-black/45 text-sm text-amber-100 ring-1 ring-white/15 backdrop-blur-sm transition hover:bg-black/70;
+  }
+  .upgrade-card {
+    @apply relative flex flex-col items-center rounded-2xl bg-black/50 px-5 py-6 text-center ring-1 ring-white/15 backdrop-blur-md transition duration-200 hover:-translate-y-1 hover:bg-black/65;
+    box-shadow: 0 0 0 0 transparent;
+  }
+  .upgrade-card:hover {
+    box-shadow: 0 0 28px -4px var(--c);
+    --tw-ring-color: var(--c);
+  }
+}
+
+.low-fuel {
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(220, 38, 38, 0.35) 100%);
+  animation: pulse-red 0.9s ease-in-out infinite;
+}
+@keyframes pulse-red {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.mushroom-glow {
+  animation: mush 3s ease-in-out infinite;
+}
+@keyframes mush {
+  50% {
+    opacity: 0.28;
+  }
+}
+
+.fade-in {
+  animation: fade 0.4s ease-out both;
+}
+.fade-in-slow {
+  animation: fade 1.2s ease-out both;
+}
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.title-flicker {
+  transform-origin: 0 30px;
+  animation: flicker 1.6s ease-in-out infinite;
+}
+@keyframes flicker {
+  25% {
+    transform: scale(1.03, 0.97) skewX(-2deg);
+  }
+  50% {
+    transform: scale(0.97, 1.04) skewX(1.5deg);
+  }
+  75% {
+    transform: scale(1.02, 0.98) skewX(-1deg);
+  }
+}
+.title-pulse {
+  animation: tpulse 2.4s ease-in-out infinite;
+  transform-origin: center;
+}
+@keyframes tpulse {
+  50% {
+    opacity: 0.6;
+    transform: scale(0.92);
+  }
+}
+
+.mote {
+  position: absolute;
+  bottom: -10px;
+  border-radius: 9999px;
+  background: #fbbf24;
+  box-shadow: 0 0 8px 2px rgba(251, 146, 60, 0.7);
+  animation-name: rise;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  opacity: 0;
+}
+@keyframes rise {
+  10% {
+    opacity: 0.9;
+  }
+  80% {
+    opacity: 0.6;
+  }
+  to {
+    transform: translate(30px, -105vh);
+    opacity: 0;
+  }
+}
