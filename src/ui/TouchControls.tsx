@@ -88,7 +88,7 @@ function Joystick({ input }: { input: InputState }) {
   )
 }
 
-export function TouchControls({ input, canRest, locked }: { input: InputState; canRest: boolean; locked: boolean }) {
+export function TouchControls({ input, canRest, locked, iso = false }: { input: InputState; canRest: boolean; locked: boolean; iso?: boolean }) {
   return (
     <div className="pointer-events-none fixed inset-0 z-10 select-none" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <Joystick input={input} />
@@ -109,9 +109,13 @@ export function TouchControls({ input, canRest, locked }: { input: InputState; c
         <Btn input={input} action="heavy" label="Heavy attack" className="h-16 w-16 text-sm">
           Heavy
         </Btn>
-        <Btn input={input} action="jump" label="Jump" className="h-16 w-16 text-sm">
-          Jump
-        </Btn>
+        {iso ? (
+          <div />
+        ) : (
+          <Btn input={input} action="jump" label="Jump" className="h-16 w-16 text-sm">
+            Jump
+          </Btn>
+        )}
         <Btn input={input} action="cast" label="Cast rite" className="h-16 w-full text-sm">
           Cast
         </Btn>

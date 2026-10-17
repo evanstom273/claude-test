@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { initAudio, sfx } from './game/audio'
+import { IsoGame } from './iso/IsoGame'
 import { Game } from './ui/Game'
 
-function Title({ onStart }: { onStart: () => void }) {
+function Title({ onStart, onIso }: { onStart: () => void; onIso: () => void }) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.code === 'Enter' || e.code === 'Space') {
@@ -43,6 +44,10 @@ function Title({ onStart }: { onStart: () => void }) {
         <button onClick={onStart} className="ink-btn mt-8 text-xl">
           Open the book
         </button>
+        <button onClick={onIso} className="ink-btn ink-btn-ghost mt-3 text-base">
+          Or look down on the farmstead
+        </button>
+        <p className="mt-1 font-fell text-xs italic text-[#4a3326]/70">an isometric experiment</p>
         <p className="mt-6 font-fell text-sm text-[#4a3326]/80">
           Feel prototype · keyboard, mouse, gamepad or touch
         </p>
@@ -52,16 +57,13 @@ function Title({ onStart }: { onStart: () => void }) {
 }
 
 export default function App() {
-  const [playing, setPlaying] = useState(false)
-  if (!playing)
-    return (
-      <Title
-        onStart={() => {
-          initAudio()
-          sfx.click()
-          setPlaying(true)
-        }}
-      />
-    )
-  return <Game onQuit={() => setPlaying(false)} />
+  const [mode, setMode] = useState<'title' | 'side' | 'iso'>('title')
+  const start = (m: 'side' | 'iso') => {
+    initAudio()
+    sfx.click()
+    setMode(m)
+  }
+  if (mode === 'side') return <Game onQuit={() => setMode('title')} />
+  if (mode === 'iso') return <IsoGame onQuit={() => setMode('title')} />
+  return <Title onStart={() => start('side')} onIso={() => start('iso')} />
 }

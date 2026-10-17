@@ -1,5 +1,5 @@
 import { RITES } from '../game/rites'
-import type { World } from '../game/types'
+import type { Enemy, Player } from '../game/types'
 
 function Bar({ value, max, width, color, back, height = 12 }: { value: number; max: number; width: number; color: string; back: string; height?: number }) {
   const k = Math.max(0, Math.min(1, value / max))
@@ -46,9 +46,7 @@ function RiteCard({ rite, tallow }: { rite: number; tallow: number }) {
   )
 }
 
-export function Hud({ w }: { w: World }) {
-  const p = w.player
-  const e = w.enemy
+export function Hud({ p, e }: { p: Player; e: Enemy }) {
   const showBoss = e.state !== 'dormant' && !(e.state === 'dead' && e.t > 3)
   return (
     <>
