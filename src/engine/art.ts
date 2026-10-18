@@ -486,3 +486,84 @@ export function propTex(kind: 'lamp' | 'torch' | 'stall' | 'flowers' | 'corpse' 
 
 /** Small portrait-friendly SVG for the dialogue book (reuses the person art). */
 export const personDataUri = (o: Outfit) => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(personSvg(o))
+
+// -------------------------------------------------------------- interiors
+
+export function booksTex(seed: number) {
+  const r = rng(seed)
+  let s = `<rect width="256" height="256" fill="#4a3022"/>`
+  for (let shelf = 0; shelf < 4; shelf++) {
+    const y = shelf * 64
+    s += `<rect x="0" y="${y + 56}" width="256" height="8" fill="#6b4a2b" stroke="${INK}" stroke-width="2"/>`
+    let x = 4
+    while (x < 250) {
+      const w = 8 + r() * 12
+      const h = 34 + r() * 18
+      const lean = r() < 0.1 ? 6 : 0
+      s += `<rect x="${x}" y="${y + 56 - h}" width="${w}" height="${h}" fill="${['#7a1f24', '#3f6a7a', '#c9a24a', '#4f6e44', '#5a3d6a', '#a8582a'][Math.floor(r() * 6)]}" stroke="${INK}" stroke-width="1.5" transform="rotate(${lean} ${x} ${y + 56})"/>`
+      s += `<path d="M${x + 2} ${y + 60 - h + 8} L${x + w - 2} ${y + 60 - h + 8}" stroke="#e0b04a" stroke-width="1.2"/>`
+      x += w + 1 + lean
+      if (r() < 0.08) x += 14
+    }
+  }
+  return svgTexture(`books-${seed}`, svg(256, 256, s), { grain: 0.3 })
+}
+
+export function rugTex(color: string, trim: string) {
+  const body = `<rect x="4" y="4" width="248" height="248" rx="10" fill="${color}" stroke="${INK}" stroke-width="4"/>
+  <rect x="22" y="22" width="212" height="212" rx="6" fill="none" stroke="${trim}" stroke-width="8"/>
+  <path d="M128 60 L196 128 L128 196 L60 128Z" fill="${trim}" stroke="${INK}" stroke-width="3"/>
+  <path d="M128 92 L164 128 L128 164 L92 128Z" fill="${color}" stroke="${INK}" stroke-width="2"/>
+  ${[40, 216].map((x) => [40, 216].map((y) => `<circle cx="${x}" cy="${y}" r="9" fill="${trim}" stroke="${INK}" stroke-width="2"/>`).join('')).join('')}`
+  return svgTexture(`rug-${color}`, svg(256, 256, body), { grain: 0.35 })
+}
+
+export function portraitTex() {
+  const body = `<rect x="4" y="4" width="120" height="152" fill="#c9a24a" stroke="${INK}" stroke-width="4"/>
+  <rect x="16" y="16" width="96" height="128" fill="#5a6a80" stroke="${INK}" stroke-width="2"/>
+  <path d="M30 144 Q32 100 64 98 Q96 100 98 144Z" fill="#3a3a6a" stroke="${INK}" stroke-width="2"/>
+  <path d="M50 102 Q64 122 78 102" stroke="#e0b04a" stroke-width="4" fill="none"/>
+  <ellipse cx="64" cy="72" rx="18" ry="22" fill="#f0c8a0" stroke="${INK}" stroke-width="2"/>
+  <path d="M46 80 Q48 104 64 106 Q80 104 82 80 Q72 90 64 90 Q56 90 46 80Z" fill="#9a9a9a" stroke="${INK}" stroke-width="1.5"/>
+  <path d="M48 56 L50 24 L78 24 L80 56Z" fill="#2b2b33" stroke="${INK}" stroke-width="2"/><ellipse cx="64" cy="56" rx="24" ry="5" fill="#2b2b33" stroke="${INK}" stroke-width="2"/>
+  <circle cx="57" cy="72" r="2.4" fill="${INK}"/><circle cx="71" cy="72" r="2.4" fill="${INK}"/>
+  <path d="M58 84 Q64 80 70 84" stroke="${INK}" stroke-width="2" fill="none"/>`
+  return svgTexture('portrait', svg(128, 160, body), { w: 128, h: 160, grain: 0.3 })
+}
+
+export function fireTex() {
+  const body = `<g filter="url(#cut)"><path d="M50 4 Q74 30 70 58 Q66 84 50 92 Q34 84 30 58 Q26 30 50 4Z" fill="#ff8a2a" stroke="${INK}" stroke-width="3"/>
+  <path d="M50 30 Q64 48 60 66 Q56 80 50 82 Q44 80 40 66 Q36 48 50 30Z" fill="#ffd27a"/>
+  <path d="M28 72 Q20 50 30 34 Q34 54 40 62Z M72 72 Q80 50 70 34 Q66 54 60 62Z" fill="#ff6a1a" stroke="${INK}" stroke-width="2"/>
+  <path d="M18 96 L82 84 M20 86 L80 96" stroke="#5a3d26" stroke-width="8" stroke-linecap="round"/></g>`
+  return svgTexture('fire', svg(100, 100, body, CUT), { w: 200, h: 200, grain: 0.1 })
+}
+
+export function papersTex() {
+  const r = rng(31)
+  let s = ''
+  for (let i = 0; i < 7; i++) {
+    const x = 20 + r() * 150
+    const y = 20 + r() * 150
+    s += `<g transform="rotate(${(r() - 0.5) * 40} ${x + 30} ${y + 40})"><rect x="${x}" y="${y}" width="60" height="80" fill="#f4ecd6" stroke="${INK}" stroke-width="2"/>${[0, 1, 2, 3, 4, 5].map((k) => `<path d="M${x + 8} ${y + 14 + k * 10} L${x + 52} ${y + 14 + k * 10}" stroke="${INK}" stroke-width="1" opacity="0.5"/>`).join('')}</g>`
+  }
+  s += `<circle cx="200" cy="200" r="14" fill="#7a1f24" stroke="${INK}" stroke-width="2"/><path d="M220 60 L180 110" stroke="${INK}" stroke-width="4"/><path d="M220 60 Q236 40 232 30 Q214 44 220 60Z" fill="#f4ecd6" stroke="${INK}" stroke-width="2"/>`
+  return svgTexture('papers', svg(256, 256, s), { grain: 0.2 })
+}
+
+/** Window glass seen from inside: bright by day, deep blue by night. */
+export function paneTex(night: boolean) {
+  const glass = night ? '#2c3456' : '#e8f2f4'
+  const body = `<rect x="6" y="6" width="116" height="116" fill="${glass}" stroke="${INK}" stroke-width="5"/>
+  ${night ? '<circle cx="90" cy="34" r="8" fill="#f4ecd6" opacity="0.8"/>' : '<path d="M20 100 L60 20 M50 110 L90 30" stroke="#ffffff" stroke-width="6" opacity="0.6"/>'}
+  <path d="M64 6 L64 122 M6 64 L122 64" stroke="${INK}" stroke-width="5"/>`
+  return svgTexture(`pane-${night}`, svg(128, 128, body), { w: 128, h: 128, grain: 0.1 })
+}
+
+export function stoneFloorTex(color: string, seed: number) {
+  const r = rng(seed)
+  let s = `<rect width="256" height="256" fill="#6b6258"/>`
+  for (let y = 0; y < 256; y += 64)
+    for (let x = y % 128 ? -32 : 0; x < 256; x += 64) s += `<rect x="${x + 3}" y="${y + 3}" width="58" height="58" rx="4" fill="${color}" opacity="${0.8 + r() * 0.2}" stroke="${INK}" stroke-width="2"/>`
+  return svgTexture(`stonefloor-${color}`, svg(256, 256, s), { repeat: true })
+}

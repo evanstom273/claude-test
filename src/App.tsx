@@ -15,8 +15,9 @@ function Title({ onStart }: { onStart: () => void }) {
     return () => window.removeEventListener('keydown', h)
   }, [onStart])
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-[#2b2118] p-4">
+    <div className="fixed inset-0 overflow-y-auto bg-[#2b2118]">
       <div className="paper-grain pointer-events-none fixed inset-0" />
+      <div className="flex min-h-full items-center justify-center p-4">
       <div className="cover relative w-full max-w-xl px-6 py-10 text-center sm:px-12">
         <svg viewBox="-120 -80 240 120" className="mx-auto w-60" aria-hidden>
           <path d="M-120 40 L-90 -6 L-70 10 L-40 -40 L-10 0 L20 -30 L60 6 L90 -16 L120 40Z" fill="#8a96b0" stroke="#2b2118" strokeWidth="2.5" />
@@ -43,6 +44,7 @@ function Title({ onStart }: { onStart: () => void }) {
           Turn the page
         </button>
         <p className="mt-6 font-fell text-sm text-[#4a3326]/80">First playable slice · keyboard & mouse, gamepad or touch</p>
+      </div>
       </div>
     </div>
   )
@@ -83,7 +85,7 @@ function Overlay({ game, touch, muted, onMute, onQuit }: { game: Game; touch: bo
   const playing = !s.dialogue && !s.sheet && !s.paused && !s.dead
   return (
     <>
-      {!s.dead && <Weapon swing={s.swing} blocking={s.blocking} moving={s.moving} running={s.running} />}
+      {!s.dead && <Weapon swing={s.swing} blocking={s.blocking} moving={s.moving} running={s.running} compact={touch} />}
       <Hud s={s} />
       {playing && !touch && !s.locked && (
         <div className="pointer-events-none fixed left-1/2 top-[40%] -translate-x-1/2 -translate-y-1/2 fade-in">

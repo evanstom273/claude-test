@@ -4,6 +4,8 @@ A first-person RPG in the spirit of Daggerfall, built as a pop-up paper book: in
 
 **Current stage: first playable slice.** The walled market town of Brindle, its townsfolk (talk to them by topic, ask for directions and rumours, buy draughts, rent a room), a day and night cycle, and the Hollow Barrow, a maze of rats and the restless dead, with one quest: the Reeve's stolen signet. Skills improve with use.
 
+Every building can be entered. Interiors are generated from each building's seed: staircases on different walls rising different ways, dividing walls with doorways, upper floors with stairwells and railings, and rooms furnished for their purpose (the Goose's bar and hearth, the Reeve's study and archive, the temple's pews and dais, Hobb's forge). Dirt paths are routed from every front door to the street.
+
 ## Controls
 
 | | Keyboard / mouse | Gamepad |

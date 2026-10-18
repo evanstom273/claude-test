@@ -15,12 +15,18 @@ export class Npc {
   talkingTo = false
   mouth = 0
 
-  constructor(public def: NpcDef) {
+  home: { x: number; z: number }
+
+  constructor(
+    public def: NpcDef,
+    home?: { x: number; z: number },
+  ) {
+    this.home = home ?? def.home
     this.idle = personTex(`npc-${def.id}`, def.outfit)
     this.talking = personTex(`npc-${def.id}`, def.outfit, true)
     this.sprite = new Billboard(this.idle, 1.05, 2.1, 0.45)
-    this.x = def.home.x
-    this.z = def.home.z
+    this.x = this.home.x
+    this.z = this.home.z
     this.sprite.root.position.set(this.x, 0, this.z)
   }
 
@@ -40,7 +46,7 @@ export class Npc {
         if (this.wait <= 0) {
           const a = Math.random() * Math.PI * 2
           const d = Math.random() * this.def.wander
-          this.target = { x: this.def.home.x + Math.cos(a) * d, z: this.def.home.z + Math.sin(a) * d }
+          this.target = { x: this.home.x + Math.cos(a) * d, z: this.home.z + Math.sin(a) * d }
         }
       } else {
         const dx = this.target.x - this.x
@@ -66,7 +72,7 @@ export class Npc {
     // a paper figure's walk: a bob and a rock from side to side
     const moving = this.target ? 1 : 0
     this.sprite.mesh.position.y = moving * Math.abs(Math.sin(this.walk)) * 0.08
-    this.sprite.mesh.rotation.z = moving * Math.sin(this.walk) * 0.05 + Math.sin(time * 1.3 + this.def.home.x) * 0.01
+    this.sprite.mesh.rotation.z = moving * Math.sin(this.walk) * 0.05 + Math.sin(time * 1.3 + this.home.x) * 0.01
     this.sprite.root.position.set(this.x, 0, this.z)
   }
 

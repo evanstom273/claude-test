@@ -3,7 +3,7 @@ import type { HudState } from '../engine/game'
 
 function Bar({ value, max, color, width }: { value: number; max: number; color: string; width: number }) {
   return (
-    <div className="paper-bar" style={{ width }}>
+    <div className="paper-bar" style={{ width: `min(${width}px, 30vw)` }}>
       <div className="h-full transition-[width] duration-150" style={{ width: `${Math.max(0, (value / max) * 100)}%`, background: color }} />
     </div>
   )
@@ -24,17 +24,15 @@ const LETTERS: [string, number][] = [
 function Compass({ yaw }: { yaw: number }) {
   // yaw 0 looks north (-z); turning right decreases yaw
   const heading = (((-yaw * 180) / Math.PI) % 360 + 360) % 360
-  const W = 260
   const span = 120
   return (
-    <div className="compass relative h-7 overflow-hidden" style={{ width: W }}>
+    <div className="compass relative h-7 overflow-hidden" style={{ width: 'min(260px, 34vw)' }}>
       {LETTERS.flatMap(([l, deg]) =>
         [-360, 0, 360].map((o) => {
           let d = deg + o - heading
           if (d < -span || d > span) return null
-          const x = W / 2 + (d / span) * (W / 2)
           return (
-            <span key={l + o} className={`absolute top-1 -translate-x-1/2 font-fell-sc ${l.length === 1 ? 'text-[15px] text-[#7a1f24]' : 'text-[11px] text-[#2b2118]/70'}`} style={{ left: x }}>
+            <span key={l + o} className={`absolute top-1 -translate-x-1/2 font-fell-sc ${l.length === 1 ? 'text-[15px] text-[#7a1f24]' : 'hidden text-[11px] text-[#2b2118]/70 sm:inline'}`} style={{ left: `${50 + (d / span) * 50}%` }}>
               {l}
             </span>
           )
@@ -86,7 +84,7 @@ export function Hud({ s }: { s: HudState }) {
       <div className="pointer-events-none fixed right-3 top-3 text-right sm:right-5 sm:top-5" style={{ top: 'max(0.75rem, env(safe-area-inset-top))', right: 'max(3.5rem, env(safe-area-inset-right))' }}>
         <div className="ledger px-2 py-0.5 font-fell">
           <div className="text-lg leading-tight">{s.clock}</div>
-          <div className="text-[11px] italic leading-tight text-[#2b2118]/70">{s.date}</div>
+          <div className="hidden text-[11px] italic leading-tight text-[#2b2118]/70 sm:block">{s.date}</div>
           <div className="font-fell-sc text-[11px] leading-tight text-[#7a1f24]">{s.location}</div>
         </div>
       </div>

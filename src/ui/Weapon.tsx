@@ -1,9 +1,9 @@
 /** The paper sword held at the bottom right, Daggerfall-style. */
-export function Weapon({ swing, blocking, moving, running }: { swing: number; blocking: boolean; moving: boolean; running: boolean }) {
+export function Weapon({ swing, blocking, moving, running, compact = false }: { swing: number; blocking: boolean; moving: boolean; running: boolean; compact?: boolean }) {
   return (
-    <div className={`weapon pointer-events-none fixed bottom-0 right-[8%] ${moving ? (running ? 'bob-fast' : 'bob') : ''}`}>
+    <div className={`weapon pointer-events-none fixed bottom-0 ${compact ? 'right-[30%]' : 'right-[8%]'} ${moving ? (running ? 'bob-fast' : 'bob') : ''}`}>
       <div key={swing} className={`${swing > 0 ? 'swing' : ''} ${blocking ? 'block' : ''}`}>
-        <svg viewBox="0 0 220 360" className="h-[46vh] max-h-[420px] min-h-[220px] drop-shadow-[5px_6px_0_rgba(20,12,8,0.45)]">
+        <svg viewBox="0 0 220 360" className={`${compact ? 'h-[min(28vh,44vw)] min-h-[140px]' : 'h-[46vh] min-h-[220px]'} max-h-[420px] drop-shadow-[5px_6px_0_rgba(20,12,8,0.45)]`}>
           <defs>
             <filter id="wcut" x="-10%" y="-10%" width="120%" height="120%">
               <feMorphology in="SourceAlpha" operator="dilate" radius="3" result="g" />

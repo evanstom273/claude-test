@@ -1,8 +1,10 @@
 import * as THREE from 'three'
 import { backdropTex, cloudTex, cobbleTex, dirtTex, doorTex, flagstoneTex, grassTex, plankTex, plasterTex, propTex, moonTex, roofTex, signTex, stoneTex, sunTex, thatchTex, treeTex, windowTex } from './art'
-import { Billboard, boxCollider, boxWU, gableEnds, gableRoof, type Collider } from './geo'
+import { Billboard, boxCollider, boxWU, gableEnds, gableRoof, type Collider, type Surface } from './geo'
+import { doorWorld, type Building, type BuildingKind } from './interiors'
 
-export type LevelId = 'town' | 'barrow'
+/** 'town', 'barrow', or `in:<building id>` for an interior. */
+export type LevelId = string
 
 export interface EnemySpawn {
   kind: 'rat' | 'skeleton'
@@ -18,6 +20,8 @@ export interface Interactable {
   radius: number
   /** Optional sprite to remove when taken. */
   sprite?: Billboard
+  /** Floor height it sits at (for upstairs things). */
+  y?: number
 }
 
 export interface Level {
@@ -35,6 +39,12 @@ export interface Level {
   sun?: THREE.DirectionalLight
   hemi?: THREE.HemisphereLight
   sky?: { sun: THREE.Mesh; moon: THREE.Mesh; clouds: THREE.Mesh[] }
+  /** Floors, stairs and daises you can stand on above the ground. */
+  surfaces?: Surface[]
+  /** Named places inside a building where its people stand. */
+  spots?: Record<string, { x: number; z: number }>
+  title?: string
+  buildingId?: string
 }
 
 const lambert = (map: THREE.Texture, opts: THREE.MeshLambertMaterialParameters = {}) => new THREE.MeshLambertMaterial({ map, ...opts })
@@ -52,6 +62,9 @@ function rng(seed: number) {
 // ----------------------------------------------------------------- town
 
 interface BuildingDef {
+  id: string
+  name: string
+  kind: BuildingKind
   x: number
   z: number
   w: number
@@ -65,20 +78,120 @@ interface BuildingDef {
   spire?: boolean
 }
 
-const BUILDINGS: BuildingDef[] = [
-  { x: -15, z: -24, w: 10, d: 9, h: 6.5, rot: 90, wall: 'plaster', roof: 'red', sign: { text: 'The Gilded Goose', pic: 'goose' } },
-  { x: 15, z: -24, w: 11, d: 9, h: 7.5, rot: 270, wall: 'stone', roof: 'slate', sign: { text: "Reeve's Hall", pic: 'scales' } },
-  { x: 24, z: 6, w: 10, d: 13, h: 9, rot: 270, wall: 'stone', roof: 'slate', sign: { text: 'The Lantern', pic: 'sun' }, spire: true },
-  { x: -22, z: 8, w: 9, d: 8, h: 5.5, rot: 90, wall: 'plaster', roof: 'thatch', sign: { text: "Hobb's Forge", pic: 'anvil' } },
-  { x: -15, z: 24, w: 9, d: 8, h: 6, rot: 90, wall: 'pink', roof: 'red' },
-  { x: 15, z: 24, w: 9, d: 8, h: 6.5, rot: 270, wall: 'blue', roof: 'thatch' },
-  { x: -28, z: -10, w: 8, d: 7, h: 5.5, rot: 90, wall: 'blue', roof: 'green' },
-  { x: 28, z: -12, w: 8, d: 8, h: 6, rot: 270, wall: 'pink', roof: 'red' },
-  { x: -28, z: 26, w: 8, d: 7, h: 5, rot: 0, wall: 'plaster', roof: 'thatch' },
-  { x: 28, z: 28, w: 8, d: 7, h: 5, rot: 0, wall: 'plaster', roof: 'green' },
-  { x: -24, z: -30, w: 8, d: 7, h: 5.5, rot: 0, wall: 'pink', roof: 'slate' },
-  { x: 26, z: -30, w: 8, d: 7, h: 5.5, rot: 0, wall: 'blue', roof: 'red' },
+export const BUILDINGS: BuildingDef[] = [
+  { id: 'goose', name: 'the Gilded Goose', kind: 'tavern', x: -15, z: -24, w: 10, d: 9, h: 6.5, rot: 90, wall: 'plaster', roof: 'red', sign: { text: 'The Gilded Goose', pic: 'goose' } },
+  { id: 'hall', name: "the Reeve's Hall", kind: 'hall', x: 15, z: -24, w: 11, d: 9, h: 7.5, rot: 270, wall: 'stone', roof: 'slate', sign: { text: "Reeve's Hall", pic: 'scales' } },
+  { id: 'temple', name: 'the Temple of the Lantern', kind: 'temple', x: 24, z: 6, w: 10, d: 13, h: 9, rot: 270, wall: 'stone', roof: 'slate', sign: { text: 'The Lantern', pic: 'sun' }, spire: true },
+  { id: 'forge', name: "Hobb's forge", kind: 'forge', x: -22, z: 8, w: 9, d: 8, h: 5.5, rot: 90, wall: 'plaster', roof: 'thatch', sign: { text: "Hobb's Forge", pic: 'anvil' } },
+  { id: 'ashby', name: 'the Ashby house', kind: 'house', x: -15, z: 24, w: 9, d: 8, h: 6, rot: 90, wall: 'pink', roof: 'red' },
+  { id: 'nell', name: "Nell's cottage", kind: 'house', x: 15, z: 24, w: 9, d: 8, h: 6.5, rot: 270, wall: 'blue', roof: 'thatch' },
+  { id: 'fennimore', name: 'the Fennimore house', kind: 'house', x: -28, z: -10, w: 8, d: 7, h: 5.5, rot: 90, wall: 'blue', roof: 'green' },
+  { id: 'cooper', name: 'the Cooper house', kind: 'house', x: 28, z: -12, w: 8, d: 8, h: 6, rot: 270, wall: 'pink', roof: 'red' },
+  { id: 'miller', name: "the miller's house", kind: 'house', x: -28, z: 26, w: 8, d: 7, h: 5, rot: 0, wall: 'plaster', roof: 'thatch' },
+  { id: 'thatcher', name: 'the Thatcher house', kind: 'house', x: 28, z: 28, w: 8, d: 7, h: 5, rot: 0, wall: 'plaster', roof: 'green' },
+  { id: 'penhallow', name: 'the Penhallow house', kind: 'house', x: -24, z: -30, w: 8, d: 7, h: 5.5, rot: 0, wall: 'pink', roof: 'slate' },
+  { id: 'crane', name: 'the Crane house', kind: 'house', x: 26, z: -30, w: 8, d: 7, h: 6, rot: 0, wall: 'blue', roof: 'red' },
 ]
+
+export const asBuilding = (b: BuildingDef, i = BUILDINGS.indexOf(b)): Building => ({ id: b.id, name: b.name, kind: b.kind, x: b.x, z: b.z, w: b.w, d: b.d, h: b.h, rot: b.rot, seed: i + 1 })
+
+/**
+ * Lays a dirt path from every front door to the nearest street or the
+ * square, searching a fine grid so paths step round buildings and crates.
+ */
+function doorPaths(lvl: Level) {
+  const CELL = 0.5
+  const HALF = 41
+  const N = Math.round((HALF * 2) / CELL)
+  const toCell = (v: number) => Math.round((v + HALF) / CELL)
+  const toWorld = (c: number) => c * CELL - HALF
+  const blocked = new Uint8Array(N * N)
+  for (let j = 0; j < N; j++)
+    for (let i = 0; i < N; i++) {
+      const x = toWorld(i)
+      const z = toWorld(j)
+      if (lvl.colliders.some((c) => x > c.minX - 0.7 && x < c.maxX + 0.7 && z > c.minZ - 0.7 && z < c.maxZ + 0.7)) blocked[j * N + i] = 1
+    }
+  const isGoal = (x: number, z: number) => Math.abs(x) <= 2.6 || Math.hypot(x, z) <= 13
+  const path = new Set<number>()
+  for (const b of BUILDINGS) {
+    const { out } = doorWorld(asBuilding(b))
+    const si = toCell(out.x)
+    const sj = toCell(out.z)
+    const prev = new Int32Array(N * N).fill(-1)
+    const q = [sj * N + si]
+    prev[q[0]] = q[0]
+    let found = -1
+    for (let h = 0; h < q.length; h++) {
+      const k = q[h]
+      const i = k % N
+      const j = Math.floor(k / N)
+      if (isGoal(toWorld(i), toWorld(j))) {
+        found = k
+        break
+      }
+      for (const [di, dj] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const ni = i + di
+        const nj = j + dj
+        if (ni < 0 || nj < 0 || ni >= N || nj >= N) continue
+        const nk = nj * N + ni
+        if (prev[nk] >= 0 || blocked[nk]) continue
+        prev[nk] = k
+        q.push(nk)
+      }
+    }
+    if (found < 0) continue
+    // walk back to the door, widening the trail by a cell each side
+    for (let k = found; ; k = prev[k]) {
+      const i = k % N
+      const j = Math.floor(k / N)
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) path.add((j + dj) * N + (i + di))
+      if (prev[k] === k) break
+    }
+    // and a little apron right up to the door itself
+    const { door } = doorWorld(asBuilding(b))
+    for (let t2 = 0; t2 <= 1; t2 += 0.1) {
+      const x = door.x + (out.x - door.x) * t2
+      const z = door.z + (out.z - door.z) * t2
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) path.add((toCell(z) + dj) * N + toCell(x) + di)
+    }
+  }
+  // one mesh of non-overlapping squares, with world-space UVs so the dirt runs on seamlessly
+  const pos: number[] = []
+  const uv: number[] = []
+  for (const k of path) {
+    const x = toWorld(k % N)
+    const z = toWorld(Math.floor(k / N))
+    const x0 = x - CELL / 2
+    const x1 = x + CELL / 2
+    const z0 = z - CELL / 2
+    const z1 = z + CELL / 2
+    pos.push(x0, 0, z0, x0, 0, z1, x1, 0, z1, x0, 0, z0, x1, 0, z1, x1, 0, z0)
+    for (const [px, pz] of [
+      [x0, z0],
+      [x0, z1],
+      [x1, z1],
+      [x0, z0],
+      [x1, z1],
+      [x1, z0],
+    ])
+      uv.push(px / 3, pz / 3)
+  }
+  const geo = new THREE.BufferGeometry()
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+  geo.computeVertexNormals()
+  const mat = lambert(dirtTex('paths'), { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 })
+  const mesh = new THREE.Mesh(geo, mat)
+  mesh.position.y = 0.005
+  mesh.receiveShadow = true
+  lvl.group.add(mesh)
+}
 
 const WALL_COLORS = { plaster: '#efe2c0', stone: '', blue: '#c8d8e0', pink: '#ecc8bc' }
 
@@ -260,6 +373,10 @@ export function buildTown(): Level {
 
   for (const b of BUILDINGS) building(b, lvl)
   townWalls(lvl)
+  for (const b of BUILDINGS) {
+    const { door } = doorWorld(asBuilding(b))
+    lvl.interactables.push({ id: `door:${b.id}`, label: `Enter ${b.name}`, x: door.x, z: door.z, radius: 1.6 })
+  }
 
   // the well in the square
   const stone = lambert(stoneTex('#b4aa98', '#a49a88', 11))
@@ -398,6 +515,7 @@ export function buildTown(): Level {
   addSprite(lvl, propTex('mushrooms'), -3.4, 87.6, 1.2, 0.7, 0)
   addSprite(lvl, propTex('mushrooms'), 3.6, 88.1, 1, 0.6, 0)
 
+  doorPaths(lvl)
   backdrop(lvl)
 
   // lighting
