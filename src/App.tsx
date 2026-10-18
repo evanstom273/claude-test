@@ -114,7 +114,7 @@ function Overlay({ game, touch, muted, onMute, onQuit, onLoad }: { game: Game; t
   const playing = !s.dialogue && !s.sheet && !s.paused && !s.dead
   return (
     <>
-      {!s.dead && <Weapon swing={s.swing} blocking={s.blocking} moving={s.moving} running={s.running} compact={touch} />}
+      {!s.dead && s.view === 'first' && <Weapon swing={s.swing} blocking={s.blocking} moving={s.moving} running={s.running} compact={touch} />}
       <Hud s={s} />
       {playing && !touch && !s.locked && (
         <div className="pointer-events-none fixed left-1/2 top-[40%] -translate-x-1/2 -translate-y-1/2 fade-in">
@@ -129,6 +129,14 @@ function Overlay({ game, touch, muted, onMute, onQuit, onLoad }: { game: Game; t
         aria-label="Pause"
       >
         ❚❚
+      </button>
+      <button
+        onClick={() => game.toggleView()}
+        className="fixed z-30 grid h-10 w-10 place-items-center rounded-full bg-[#2b2118]/60 font-fell-sc text-[13px] text-[#f4ecd6] ring-1 ring-[#f4ecd6]/30"
+        style={{ top: 'calc(max(0.75rem, env(safe-area-inset-top)) + 3rem)', right: 'max(0.75rem, env(safe-area-inset-right))' }}
+        aria-label="Switch camera"
+      >
+        {s.view === 'first' ? '3rd' : '1st'}
       </button>
       {s.dialogue && <DialogueBook d={s.dialogue} onChoose={(id) => game.choose(id)} onClose={() => game.endDialogue()} />}
       {s.sheet && <CharacterSheet s={s} onClose={() => game.toggleSheet()} />}
@@ -158,7 +166,8 @@ function Overlay({ game, touch, muted, onMute, onQuit, onLoad }: { game: Game; t
                     ['Talk / use', 'E'],
                     ['Healing draught', 'Q'],
                     ['Character & journal', 'C · Tab'],
-                    ['Gamepad', 'Sticks move/look · RT strike · LT block · A jump · B use · X draught · Y book'],
+                    ['First / third person', 'V'],
+                    ['Gamepad', 'Sticks move/look · RT strike · LT block · A jump · B use · X draught · Y book · R3 camera'],
                   ].map(([k, v]) => (
                     <div key={k} className="contents">
                       <dt className="font-fell-sc text-[#7a1f24]">{k}</dt>

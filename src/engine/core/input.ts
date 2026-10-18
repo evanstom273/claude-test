@@ -1,4 +1,4 @@
-export type Action = 'forward' | 'back' | 'left' | 'right' | 'run' | 'jump' | 'attack' | 'block' | 'use' | 'potion' | 'sheet' | 'pause'
+export type Action = 'forward' | 'back' | 'left' | 'right' | 'run' | 'jump' | 'attack' | 'block' | 'use' | 'potion' | 'sheet' | 'pause' | 'view'
 
 const KEYS: Record<string, Action> = {
   KeyW: 'forward',
@@ -19,9 +19,10 @@ const KEYS: Record<string, Action> = {
   Tab: 'sheet',
   Escape: 'pause',
   KeyP: 'pause',
+  KeyV: 'view',
 }
 
-// Xbox layout: A jump, B use, X potion, Y sheet, RT attack, LT block, LB run, Start pause
+// Xbox layout: A jump, B use, X potion, Y sheet, RT attack, LT block, LB run, Start pause, R3 camera
 const PAD: [number, Action][] = [
   [0, 'jump'],
   [1, 'use'],
@@ -33,6 +34,7 @@ const PAD: [number, Action][] = [
   [4, 'block'],
   [10, 'run'],
   [9, 'pause'],
+  [11, 'view'],
 ]
 
 /** Keyboard, mouse, gamepad and touch merged into one state. */

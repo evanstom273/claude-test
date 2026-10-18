@@ -225,3 +225,24 @@ export function segmentBlocked(ax: number, az: number, bx: number, bz: number, c
   }
   return false
 }
+
+/** How far along the segment a→b (0..1) it first enters a box, or 1 if it never does. */
+export function rayHit(a: { x: number; y: number; z: number }, b: { x: number; y: number; z: number }, cols: Collider[]) {
+  let best = 1
+  const d = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z }
+  for (const c of cols) {
+    let t0 = 0
+    let t1 = best
+    const slab = (o: number, dir: number, lo: number, hi: number) => {
+      if (Math.abs(dir) < 1e-9) return o >= lo && o <= hi
+      let n = (lo - o) / dir
+      let f = (hi - o) / dir
+      if (n > f) [n, f] = [f, n]
+      t0 = Math.max(t0, n)
+      t1 = Math.min(t1, f)
+      return t0 <= t1
+    }
+    if (slab(a.x, d.x, c.minX, c.maxX) && slab(a.z, d.z, c.minZ, c.maxZ) && slab(a.y, d.y, c.y0 ?? -1e9, c.y1 ?? 1e9)) best = Math.min(best, t0)
+  }
+  return best
+}

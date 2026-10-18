@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { DIALOGUE, ITEMS, levelDef, NPCS, PLAYER, PROPS, type NoteKind } from '../../data'
-import type { Outfit } from '../render/art'
+import { travellerTex, type Outfit, type TravellerPose } from '../render/art'
 import { Enemy, type EnemyEvent } from '../entities/enemy'
 import type { Entity, Tick } from '../entities/entity'
 import { EntityManager } from '../entities/manager'
@@ -9,7 +9,7 @@ import { Prop } from '../entities/prop'
 import { directions, placeFor, placeTopics, rumour, topic, topicsFor, type TopicView } from '../systems/dialogue'
 import { apply, check, pick, type RuleHost } from '../systems/rules'
 import { advance, clockText, dateText } from '../systems/time'
-import { resolveCircle, supportAt } from '../world/geo'
+import { Billboard, rayHit, resolveCircle, supportAt } from '../world/geo'
 import { buildInterior, doorWorld } from '../world/interiors'
 import { asBuilding, buildBarrow, buildTown, BUILDINGS, type Level, type LevelId } from '../world/levels'
 import { updateSky } from '../world/sky'
@@ -68,10 +68,26 @@ export interface HudState {
   skills: Skill[]
   items: string[]
   locked: boolean
+  view: View
+}
+
+export type View = 'first' | 'third'
+
+const VIEW_KEY = 'quillmarch.view'
+const readView = (): View => {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'third' ? 'third' : 'first'
+  } catch {
+    return 'first'
+  }
 }
 
 const EYE = 1.62
 const RADIUS = 0.35
+/** Third person: how far behind, how far over the right shoulder, and where the camera aims. */
+const CAM_DIST = 3.2
+const CAM_SIDE = 0.45
+const CAM_AIM = 1.5
 const { move: MOVE, staminaUse: STAM, combat: COMBAT } = PLAYER
 
 export class Game implements RuleHost {
@@ -115,6 +131,12 @@ export class Game implements RuleHost {
   noteId = 0
   prompt: string | null = null
   focusTarget: Entity | null = null
+  view: View = readView()
+  /** You, seen from behind, for third person. */
+  avatar: Billboard
+  avatarPoses: Record<TravellerPose, THREE.Texture>
+  /** Third-person camera distance, eased so it doesn't snap when a wall gets in the way. */
+  camDist = CAM_DIST
 
   private listeners = new Set<() => void>()
   private snapshot: HudState
@@ -136,6 +158,9 @@ export class Game implements RuleHost {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.camera.add(this.lantern)
     this.scene.add(this.camera)
+    this.avatarPoses = { idle: travellerTex(PLAYER.outfit, 'idle'), windup: travellerTex(PLAYER.outfit, 'windup'), strike: travellerTex(PLAYER.outfit, 'strike'), block: travellerTex(PLAYER.outfit, 'block') }
+    this.avatar = new Billboard(this.avatarPoses.idle, 1.05, 2.1, 0.45)
+    this.scene.add(this.avatar.root)
     this.state = loaded ?? newGame()
     this.loadLevel(this.state.level)
     const at = this.state.player.at
@@ -218,6 +243,7 @@ export class Game implements RuleHost {
         .filter((id) => ITEMS[id]?.listed !== false)
         .map((id) => ITEMS[id]?.name ?? id),
       locked: document.pointerLockElement === this.canvas,
+      view: this.view,
     }
   }
 
@@ -363,7 +389,8 @@ export class Game implements RuleHost {
     const look = this.input
     const p = this.p
     this.yaw -= look.lookX
-    this.pitch = Math.max(-1.3, Math.min(1.3, this.pitch - look.lookY))
+    // third person can't look as far up: the camera would end up underground
+    this.pitch = Math.max(-1.3, Math.min(this.view === 'third' ? 0.6 : 1.3, this.pitch - look.lookY))
     look.lookX = look.lookY = 0
 
     const mv = look.readMove()
@@ -440,11 +467,58 @@ export class Game implements RuleHost {
     const sx = (Math.random() - 0.5) * this.shake * 0.08
     const sy = (Math.random() - 0.5) * this.shake * 0.08
     const bobY = Math.sin(this.bob * 2) * 0.045 * (this.onGround ? 1 : 0)
-    this.camera.position.set(this.pos.x + sx, this.pos.y + EYE + bobY + sy - (this.dead ? Math.min(1.3, this.deadT * 1.5) : 0), this.pos.z)
     this.camera.rotation.order = 'YXZ'
     this.camera.rotation.y = this.yaw
     this.camera.rotation.x = this.pitch
-    this.camera.rotation.z = this.dead ? Math.min(0.5, this.deadT * 0.6) : 0
+    this.updateAvatar()
+    if (this.view === 'first') {
+      this.camera.position.set(this.pos.x + sx, this.pos.y + EYE + bobY + sy - (this.dead ? Math.min(1.3, this.deadT * 1.5) : 0), this.pos.z)
+      this.camera.rotation.z = this.dead ? Math.min(0.5, this.deadT * 0.6) : 0
+      return
+    }
+    // third person: orbit behind and over the shoulder, pulled in if a wall is in the way
+    this.camera.rotation.z = 0
+    const fx = -Math.sin(this.yaw)
+    const fz = -Math.cos(this.yaw)
+    const aim = new THREE.Vector3(this.pos.x + Math.cos(this.yaw) * CAM_SIDE, this.pos.y + CAM_AIM, this.pos.z - Math.sin(this.yaw) * CAM_SIDE)
+    const back = new THREE.Vector3(-fx * Math.cos(this.pitch), -Math.sin(this.pitch), -fz * Math.cos(this.pitch))
+    const want = aim.clone().addScaledVector(back, CAM_DIST + 0.3)
+    const free = rayHit(aim, want, this.level.colliders) * (CAM_DIST + 0.3) - 0.3
+    const target = Math.max(0.4, Math.min(CAM_DIST, free))
+    // pull in at once, ease back out
+    this.camDist = target < this.camDist ? target : this.camDist + (target - this.camDist) * Math.min(1, dt * 4)
+    const cam = aim.addScaledVector(back, this.camDist)
+    cam.y = Math.max(cam.y, supportAt(this.level.surfaces, cam.x, cam.z, this.pos.y + 0.5) + 0.3)
+    this.camera.position.set(cam.x + sx, cam.y + sy, cam.z)
+    // backed right up against a wall, your own head would fill the screen
+    if (this.camDist < 0.9) this.avatar.root.visible = false
+  }
+
+  /** Your paper figure in third person: walks, swings, blocks, falls over. */
+  private updateAvatar() {
+    const a = this.avatar
+    a.root.visible = this.view === 'third'
+    if (!a.root.visible) return
+    const ph = this.swing.phase
+    a.setTexture(this.avatarPoses[ph === 'windup' ? 'windup' : ph === 'strike' || ph === 'recover' ? 'strike' : this.blocking ? 'block' : 'idle'])
+    a.root.position.copy(this.pos)
+    a.face(this.camera.position)
+    const moving = this.onGround && Math.hypot(this.vel.x, this.vel.z) > 0.5
+    a.mesh.position.y = moving ? Math.abs(Math.sin(this.bob * 2)) * 0.08 : 0
+    a.mesh.rotation.z = moving ? Math.sin(this.bob * 2) * 0.05 : 0
+    // the cut-out tips over backwards when you die
+    a.mesh.rotation.x = this.dead ? -(Math.PI / 2) * Math.min(1, this.deadT / 0.45) : 0
+  }
+
+  toggleView() {
+    this.view = this.view === 'first' ? 'third' : 'first'
+    this.camDist = CAM_DIST
+    try {
+      localStorage.setItem(VIEW_KEY, this.view)
+    } catch {
+      // not remembered, but still switches
+    }
+    this.publish()
   }
 
   // -------------------------------------------------------------- interaction
@@ -722,6 +796,7 @@ export class Game implements RuleHost {
       this.publish()
     }
     if (a === 'sheet' && !this.dialogue && !this.dead) this.toggleSheet()
+    if (a === 'view') this.toggleView()
   }
 
   toggleSheet() {
