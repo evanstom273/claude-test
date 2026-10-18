@@ -348,6 +348,34 @@ export function personTex(key: string, o: Outfit, talking = false) {
   return svgTexture(`${key}-${talking}`, personSvg(o, talking), { w: 200, h: 400, grain: 0.25 })
 }
 
+export type TravellerPose = 'idle' | 'windup' | 'strike' | 'block'
+
+/** The player seen from behind, for the third-person camera, sword in the right hand. */
+export function travellerSvg(o: Outfit, pose: TravellerPose) {
+  const legs = `<rect x="38" y="140" width="10" height="46" fill="${o.legs}" stroke="${INK}" stroke-width="2"/><rect x="52" y="140" width="10" height="46" fill="${o.legs}" stroke="${INK}" stroke-width="2"/>`
+  const shoes = `<path d="M34 186 L48 186 L48 194 L32 194Z M52 186 L66 186 L68 194 L52 194Z" fill="#3b2a1c" stroke="${INK}" stroke-width="2"/>`
+  const body = `<path d="M34 80 L66 80 L70 146 L30 146Z" fill="${o.top}" stroke="${INK}" stroke-width="2.5"/><rect x="30" y="122" width="40" height="6" fill="${o.trim}" stroke="${INK}" stroke-width="1.5"/>`
+  const leftArm = `<path d="M34 82 L24 86 L20 128 L28 128 L32 96Z" fill="${o.top}" stroke="${INK}" stroke-width="2"/><circle cx="24" cy="132" r="5" fill="${o.skin}" stroke="${INK}" stroke-width="1.5"/>`
+  const blade = (x1: number, y1: number, x2: number, y2: number) => `<path d="M${x1} ${y1} L${x2} ${y2}" stroke="${INK}" stroke-width="8" stroke-linecap="round"/><path d="M${x1} ${y1} L${x2} ${y2}" stroke="#d8dce0" stroke-width="5" stroke-linecap="round"/>`
+  // the right arm and sword, per pose
+  const right: Record<TravellerPose, string> = {
+    idle: `${blade(78, 134, 92, 184)}<path d="M66 82 L76 86 L80 128 L72 128 L68 96Z" fill="${o.top}" stroke="${INK}" stroke-width="2"/><circle cx="77" cy="132" r="5" fill="${o.skin}" stroke="${INK}" stroke-width="1.5"/>`,
+    windup: `${blade(84, 50, 74, 4)}<path d="M64 84 L74 80 L88 54 L80 50 L66 76Z" fill="${o.top}" stroke="${INK}" stroke-width="2"/><circle cx="84" cy="50" r="5" fill="${o.skin}" stroke="${INK}" stroke-width="1.5"/>`,
+    strike: `<path d="M64 84 L74 82 L62 116 L54 112Z" fill="${o.top}" stroke="${INK}" stroke-width="2"/><circle cx="58" cy="116" r="5" fill="${o.skin}" stroke="${INK}" stroke-width="1.5"/>${blade(58, 116, 14, 140)}`,
+    block: `<path d="M64 84 L74 82 L80 96 L72 100Z" fill="${o.top}" stroke="${INK}" stroke-width="2"/><circle cx="78" cy="98" r="5" fill="${o.skin}" stroke="${INK}" stroke-width="1.5"/>${blade(90, 100, 12, 66)}`,
+  }
+  // the back of the head: hair, or a hood pulled up
+  const head =
+    o.hat === 'hood'
+      ? `<path d="M30 74 Q26 26 50 24 Q74 26 70 74 Q50 82 30 74Z" fill="${o.trim}" stroke="${INK}" stroke-width="2"/>`
+      : `<rect x="45" y="70" width="10" height="12" fill="${o.skin}" stroke="${INK}" stroke-width="1.5"/><ellipse cx="50" cy="54" rx="16" ry="18" fill="${o.hair}" stroke="${INK}" stroke-width="2"/>`
+  const swordBehind = pose === 'block' || pose === 'idle'
+  const g = `<g filter="url(#cut)">${legs}${shoes}${body}${leftArm}${swordBehind ? '' : head}${right[pose]}${swordBehind ? head : ''}</g>`
+  return svg(100, 200, g, CUT)
+}
+
+export const travellerTex = (o: Outfit, pose: TravellerPose) => svgTexture(`traveller-${pose}`, travellerSvg(o, pose), { w: 200, h: 400, grain: 0.25 })
+
 export type SkeletonFrame = 'idle' | 'windup' | 'strike' | 'hurt'
 
 export function skeletonTex(frame: SkeletonFrame) {

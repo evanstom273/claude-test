@@ -188,6 +188,8 @@ export interface PlayerDef {
   skills: { id: string; name: string; value: number }[]
   time: { minutes: number; day: number }
   journal: string[]
+  /** How you look in third person. */
+  outfit: Outfit
   note: string
   move: { walk: number; run: number; jump: number; gravity: number }
   staminaUse: { run: number; jump: number; regen: number }

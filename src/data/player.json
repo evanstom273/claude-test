@@ -3,18 +3,58 @@
   "hp": 60,
   "stamina": 80,
   "gold": 25,
-  "inventory": { "potion": 2 },
+  "inventory": {
+    "potion": 2
+  },
   "skills": [
-    { "id": "blade", "name": "Blade", "value": 18 },
-    { "id": "block", "name": "Block", "value": 14 },
-    { "id": "athletics", "name": "Athletics", "value": 12 },
-    { "id": "etiquette", "name": "Etiquette", "value": 10 }
+    {
+      "id": "blade",
+      "name": "Blade",
+      "value": 18
+    },
+    {
+      "id": "block",
+      "name": "Block",
+      "value": 14
+    },
+    {
+      "id": "athletics",
+      "name": "Athletics",
+      "value": 12
+    },
+    {
+      "id": "etiquette",
+      "name": "Etiquette",
+      "value": 10
+    }
   ],
-  "time": { "minutes": 510, "day": 0 },
-  "journal": ["Arrived in Brindle, a market town in the Quillmarch, with 25 gold and a sword that has seen better days."],
+  "time": {
+    "minutes": 510,
+    "day": 0
+  },
+  "journal": [
+    "Arrived in Brindle, a market town in the Quillmarch, with 25 gold and a sword that has seen better days."
+  ],
+  "outfit": {
+    "skin": "#e8b890",
+    "hair": "#5a3d26",
+    "top": "#3f6a7a",
+    "trim": "#c9a24a",
+    "legs": "#3a2a1c",
+    "hat": "hood"
+  },
   "note": "You arrive at Brindle as the morning bells ring.",
-  "move": { "walk": 4.2, "run": 7, "jump": 5.4, "gravity": 15 },
-  "staminaUse": { "run": 11, "jump": 6, "regen": 16 },
+  "move": {
+    "walk": 4.2,
+    "run": 7,
+    "jump": 5.4,
+    "gravity": 15
+  },
+  "staminaUse": {
+    "run": 11,
+    "jump": 6,
+    "regen": 16
+  },
   "combat": {
     "windup": 0.13,
     "strike": 0.1,
@@ -28,7 +68,11 @@
     "block": 0.2,
     "blockStamina": 10
   },
-  "levelUp": { "raises": 5, "hp": 10, "stamina": 6 },
+  "levelUp": {
+    "raises": 5,
+    "hp": 10,
+    "stamina": 6
+  },
   "respawn": {
     "level": "in:temple",
     "x": 0,
