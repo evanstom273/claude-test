@@ -1,20 +1,24 @@
 import * as THREE from 'three'
-import { backdropTex, cloudTex, cobbleTex, dirtTex, doorTex, flagstoneTex, grassTex, plankTex, plasterTex, propTex, moonTex, roofTex, signTex, stoneTex, sunTex, thatchTex, treeTex, windowTex } from './art'
+import { backdropTex, cloudTex, cobbleTex, dirtTex, doorTex, flagstoneTex, grassTex, plankTex, plasterTex, propTex, moonTex, roofTex, signTex, stoneTex, sunTex, thatchTex, treeTex, windowTex } from '../render/art'
 import { Billboard, boxCollider, boxWU, gableEnds, gableRoof, type Collider, type Surface } from './geo'
-import { doorWorld, type Building, type BuildingKind } from './interiors'
+import { BUILDINGS, type BuildingDef, type EnemyKind } from '../../data'
+import { doorWorld, type Building } from './interiors'
 
 /** 'town', 'barrow', or `in:<building id>` for an interior. */
 export type LevelId = string
 
 export interface EnemySpawn {
-  kind: 'rat' | 'skeleton'
+  kind: EnemyKind
   x: number
   z: number
 }
 
-export interface Interactable {
-  id: string
-  label: string
+/** A usable thing placed in a level; what it does comes from props.json. */
+export interface PropSpawn {
+  /** Key into props.json. */
+  def: string
+  /** Fills `{id}` and `{building}` in the prop's label and effects. */
+  building?: { id: string; name: string }
   x: number
   z: number
   radius: number
@@ -30,7 +34,7 @@ export interface Level {
   colliders: Collider[]
   spawn: { x: number; z: number; yaw: number }
   enemies: EnemySpawn[]
-  interactables: Interactable[]
+  props: PropSpawn[]
   outdoors: boolean
   /** Sprites that should keep facing the camera. */
   billboards: Billboard[]
@@ -61,37 +65,7 @@ function rng(seed: number) {
 
 // ----------------------------------------------------------------- town
 
-interface BuildingDef {
-  id: string
-  name: string
-  kind: BuildingKind
-  x: number
-  z: number
-  w: number
-  d: number
-  h: number
-  /** Degrees; the door faces local +z, so 90 faces +x. */
-  rot: 0 | 90 | 180 | 270
-  wall: 'plaster' | 'stone' | 'blue' | 'pink'
-  roof: 'red' | 'slate' | 'thatch' | 'green'
-  sign?: { text: string; pic: 'goose' | 'scales' | 'anvil' | 'sun' }
-  spire?: boolean
-}
-
-export const BUILDINGS: BuildingDef[] = [
-  { id: 'goose', name: 'the Gilded Goose', kind: 'tavern', x: -15, z: -24, w: 10, d: 9, h: 6.5, rot: 90, wall: 'plaster', roof: 'red', sign: { text: 'The Gilded Goose', pic: 'goose' } },
-  { id: 'hall', name: "the Reeve's Hall", kind: 'hall', x: 15, z: -24, w: 11, d: 9, h: 7.5, rot: 270, wall: 'stone', roof: 'slate', sign: { text: "Reeve's Hall", pic: 'scales' } },
-  { id: 'temple', name: 'the Temple of the Lantern', kind: 'temple', x: 24, z: 6, w: 10, d: 13, h: 9, rot: 270, wall: 'stone', roof: 'slate', sign: { text: 'The Lantern', pic: 'sun' }, spire: true },
-  { id: 'forge', name: "Hobb's forge", kind: 'forge', x: -22, z: 8, w: 9, d: 8, h: 5.5, rot: 90, wall: 'plaster', roof: 'thatch', sign: { text: "Hobb's Forge", pic: 'anvil' } },
-  { id: 'ashby', name: 'the Ashby house', kind: 'house', x: -15, z: 24, w: 9, d: 8, h: 6, rot: 90, wall: 'pink', roof: 'red' },
-  { id: 'nell', name: "Nell's cottage", kind: 'house', x: 15, z: 24, w: 9, d: 8, h: 6.5, rot: 270, wall: 'blue', roof: 'thatch' },
-  { id: 'fennimore', name: 'the Fennimore house', kind: 'house', x: -28, z: -10, w: 8, d: 7, h: 5.5, rot: 90, wall: 'blue', roof: 'green' },
-  { id: 'cooper', name: 'the Cooper house', kind: 'house', x: 28, z: -12, w: 8, d: 8, h: 6, rot: 270, wall: 'pink', roof: 'red' },
-  { id: 'miller', name: "the miller's house", kind: 'house', x: -28, z: 26, w: 8, d: 7, h: 5, rot: 0, wall: 'plaster', roof: 'thatch' },
-  { id: 'thatcher', name: 'the Thatcher house', kind: 'house', x: 28, z: 28, w: 8, d: 7, h: 5, rot: 0, wall: 'plaster', roof: 'green' },
-  { id: 'penhallow', name: 'the Penhallow house', kind: 'house', x: -24, z: -30, w: 8, d: 7, h: 5.5, rot: 0, wall: 'pink', roof: 'slate' },
-  { id: 'crane', name: 'the Crane house', kind: 'house', x: 26, z: -30, w: 8, d: 7, h: 6, rot: 0, wall: 'blue', roof: 'red' },
-]
+export { BUILDINGS }
 
 export const asBuilding = (b: BuildingDef, i = BUILDINGS.indexOf(b)): Building => ({ id: b.id, name: b.name, kind: b.kind, x: b.x, z: b.z, w: b.w, d: b.d, h: b.h, rot: b.rot, seed: i + 1 })
 
@@ -337,7 +311,7 @@ function backdrop(lvl: Level) {
 }
 
 export function buildTown(): Level {
-  const lvl: Level = { id: 'town', group: new THREE.Group(), colliders: [], spawn: { x: 0, z: 30, yaw: 0 }, enemies: [], interactables: [], outdoors: true, billboards: [], nightLights: [] }
+  const lvl: Level = { id: 'town', group: new THREE.Group(), colliders: [], spawn: { x: 0, z: 30, yaw: 0 }, enemies: [], props: [], outdoors: true, billboards: [], nightLights: [] }
   const r = rng(77)
 
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), lambert(grassTex()))
@@ -375,7 +349,7 @@ export function buildTown(): Level {
   townWalls(lvl)
   for (const b of BUILDINGS) {
     const { door } = doorWorld(asBuilding(b))
-    lvl.interactables.push({ id: `door:${b.id}`, label: `Enter ${b.name}`, x: door.x, z: door.z, radius: 1.6 })
+    lvl.props.push({ def: 'door', building: b, x: door.x, z: door.z, radius: 1.6 })
   }
 
   // the well in the square
@@ -511,7 +485,7 @@ export function buildTown(): Level {
   mouth.rotation.y = Math.PI
   lvl.group.add(mouth)
   lvl.colliders.push(boxCollider(0, 90.2, 4.6, 4.4))
-  lvl.interactables.push({ id: 'enterBarrow', label: 'Enter the Hollow Barrow', x: 0, z: 86.6, radius: 2.4 })
+  lvl.props.push({ def: 'enterBarrow', x: 0, z: 86.6, radius: 2.4 })
   addSprite(lvl, propTex('mushrooms'), -3.4, 87.6, 1.2, 0.7, 0)
   addSprite(lvl, propTex('mushrooms'), 3.6, 88.1, 1, 0.6, 0)
 
@@ -601,7 +575,7 @@ function carve(n: number, seed: number) {
 export function buildBarrow(): Level {
   const n = 19
   const { g, rooms } = carve(n, 1847)
-  const lvl: Level = { id: 'barrow', group: new THREE.Group(), colliders: [], spawn: { x: 1 * TILE + TILE / 2, z: 1 * TILE + TILE / 2, yaw: Math.PI }, enemies: [], interactables: [], outdoors: false, billboards: [], nightLights: [] }
+  const lvl: Level = { id: 'barrow', group: new THREE.Group(), colliders: [], spawn: { x: 1 * TILE + TILE / 2, z: 1 * TILE + TILE / 2, yaw: Math.PI }, enemies: [], props: [], outdoors: false, billboards: [], nightLights: [] }
   const r = rng(5)
   const cx = (x: number) => x * TILE + TILE / 2
 
@@ -685,8 +659,8 @@ export function buildBarrow(): Level {
   addSprite(lvl, propTex('corpse'), cx(far.x), cx(far.y) + 0.6, 2.6, 0.8, 0)
   const ring = addSprite(lvl, propTex('ring'), cx(far.x) + 0.6, cx(far.y) - 0.4, 0.6, 0.6, 0.2, true)
   ring.root.position.y = 0.25
-  lvl.interactables.push({ id: 'ring', label: "Take the Reeve's signet", x: cx(far.x) + 0.6, z: cx(far.y) - 0.4, radius: 1.8, sprite: ring })
-  lvl.interactables.push({ id: 'jory', label: 'Search the body', x: cx(far.x), z: cx(far.y) + 0.6, radius: 1.8 })
+  lvl.props.push({ def: 'ring', x: cx(far.x) + 0.6, z: cx(far.y) - 0.4, radius: 1.8, sprite: ring })
+  lvl.props.push({ def: 'jory', x: cx(far.x), z: cx(far.y) + 0.6, radius: 1.8 })
 
   // the way out, behind where you came in
   const exit = addSprite(lvl, propTex('exit'), cx(1), cx(1) - TILE / 2 + 0.3, 2.4, 3.6, 0)
@@ -694,7 +668,7 @@ export function buildBarrow(): Level {
     exit.pivot.rotation.y = 0
   }
   g[0][1] = true
-  lvl.interactables.push({ id: 'leaveBarrow', label: 'Climb back up to daylight', x: cx(1), z: cx(1) - 1.2, radius: 1.8 })
+  lvl.props.push({ def: 'leaveBarrow', x: cx(1), z: cx(1) - 1.2, radius: 1.8 })
 
   // face down whichever corridor leads away from the entrance (yaw 0 looks toward -z)
   const out = [

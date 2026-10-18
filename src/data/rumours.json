@@ -1,0 +1,25 @@
+{
+  "none": [
+    "They say the barrow down the south road is older than the town. Older than the hills, if you ask Nell, which nobody does.",
+    "Jory Quickfingers was in the Goose three nights back, buying rounds with money he never earned. Nobody has seen him since.",
+    "The Reeve's been in a right state all week. Something about a ring. Man's lost without his paperwork.",
+    "Mother Tansy waters the ale. Don't tell her I said.",
+    "A traveller with a sword? You want the Reeve. He has been asking anyone who looks remotely capable. The bar is low.",
+    "The rats in the barrow are the size of dogs. Small dogs. Very cross ones."
+  ],
+  "accepted": [
+    "Going into the barrow? Mind the dead. They don't like visitors and they've had a long time to think about it.",
+    "Jory went south, last anyone saw. Running, with a candle in one hand and his dignity in the other.",
+    "The skeletons down there swing slow but hard. Wait for the arm to come up, then get out of the way.",
+    "If you find Jory, tell him he owes me four pennies and an apology."
+  ],
+  "found": [
+    "Is that the Reeve's ring? Get it back to him before he worries himself into a puddle.",
+    "You came back out of the barrow? Most people come back out of it in a sack."
+  ],
+  "done": [
+    "You found the Reeve's ring! Well, aren't you the hero of the hour. The hour's nearly up, mind.",
+    "The Reeve's been smiling all day. It's very unsettling.",
+    "Poor Jory. Mind you, he did steal from the Reeve. And from me. And from everyone."
+  ]
+}

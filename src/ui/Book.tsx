@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
-import { personDataUri } from '../engine/art'
-import type { DialogueView, HudState } from '../engine/game'
+import { personDataUri } from '../engine/render/art'
+import type { DialogueView, HudState } from '../engine/core/game'
 
 /** Conversations happen on an open book: portrait on the left page, words on the right. */
 export function DialogueBook({ d, onChoose, onClose }: { d: DialogueView; onChoose: (id: string) => void; onClose: () => void }) {

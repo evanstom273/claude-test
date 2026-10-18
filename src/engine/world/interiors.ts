@@ -1,9 +1,8 @@
 import * as THREE from 'three'
-import { booksTex, doorTex, fireTex, paneTex, papersTex, plankTex, plasterTex, portraitTex, propTex, rugTex, stoneFloorTex, stoneTex } from './art'
+import { booksTex, doorTex, fireTex, paneTex, papersTex, plankTex, plasterTex, portraitTex, propTex, rugTex, stoneFloorTex, stoneTex } from '../render/art'
 import { Billboard, boxWU, type Collider, type Surface } from './geo'
+import type { BuildingKind } from '../../data'
 import type { Level } from './levels'
-
-export type BuildingKind = 'tavern' | 'hall' | 'temple' | 'forge' | 'house'
 
 export interface Building {
   id: string
@@ -74,7 +73,7 @@ export function buildInterior(b: Building): Level {
     colliders: [],
     spawn: { x: 0, z: b.d / 2 - 1.1, yaw: 0 },
     enemies: [],
-    interactables: [],
+    props: [],
     outdoors: false,
     billboards: [],
     nightLights: [],
@@ -128,7 +127,7 @@ export function buildInterior(b: Building): Level {
   door.position.set(0, 1.25, b.d / 2 - WALL_T - 0.01)
   door.rotation.y = Math.PI
   g.add(door)
-  lvl.interactables.push({ id: 'exit', label: `Leave ${b.name}`, x: 0, z: b.d / 2 - 0.6, radius: 1.4 })
+  lvl.props.push({ def: 'exit', building: b, x: 0, z: b.d / 2 - 0.6, radius: 1.4 })
 
   // areas kept clear of furniture and walls, per floor: the front door, the foot and head of the stairs, doorways
   const keepouts: (Rect & { floor: number })[] = [{ x0: -1.1, z0: inner.z1 - 1.8, x1: 1.1, z1: inner.z1, floor: 0 }]

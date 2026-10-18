@@ -1,19 +1,24 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { initAudio, isMuted, setMuted } from './engine/audio'
-import { Game } from './engine/game'
+import { initAudio, isMuted, setMuted } from './engine/core/audio'
+import { Game } from './engine/core/game'
+import { latestSave, readSave, type Slot } from './engine/core/save'
+import type { GameState } from './engine/core/state'
 import { CharacterSheet, DialogueBook } from './ui/Book'
 import { Hud } from './ui/Hud'
+import { SaveSlots } from './ui/Saves'
 import { TouchControls } from './ui/Touch'
 import { Weapon } from './ui/Weapon'
 
 const isTouch = () => window.matchMedia?.('(pointer: coarse)').matches
 
-function Title({ onStart }: { onStart: () => void }) {
+function Title({ onNew, onLoad }: { onNew: () => void; onLoad: (slot: Slot) => void }) {
+  const [latest] = useState(latestSave)
+  const [loading, setLoading] = useState(false)
   useEffect(() => {
-    const h = (e: KeyboardEvent) => e.code === 'Enter' && onStart()
+    const h = (e: KeyboardEvent) => e.code === 'Enter' && !loading && (latest ? onLoad(latest) : onNew())
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
-  }, [onStart])
+  }, [onNew, onLoad, latest, loading])
   return (
     <div className="fixed inset-0 overflow-y-auto bg-[#2b2118]">
       <div className="paper-grain pointer-events-none fixed inset-0" />
@@ -40,9 +45,29 @@ function Title({ onStart }: { onStart: () => void }) {
         <div className="mt-3 font-fell-sc text-sm tracking-[0.5em] text-[#7a1f24]">A Tale of the Quillmarch</div>
         <h1 className="mt-1 font-fell text-6xl text-[#2b2118] sm:text-7xl">Quillmarch</h1>
         <p className="mx-auto mt-4 max-w-sm font-fell text-lg italic text-[#4a3326]">A pop-up kingdom of ink and paper. A small town with a small problem. A traveller with a sword that has seen better days.</p>
-        <button onClick={onStart} className="ink-btn mt-8 text-xl">
-          Turn the page
-        </button>
+        {loading ? (
+          <div className="mt-8">
+            <SaveSlots mode="load" onPick={onLoad} onBack={() => setLoading(false)} />
+          </div>
+        ) : latest ? (
+          <div className="mt-8 flex flex-col items-center gap-2">
+            <button onClick={() => onLoad(latest)} className="ink-btn text-xl">
+              Continue
+            </button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <button onClick={onNew} className="ink-btn ink-btn-ghost">
+                Turn a new page
+              </button>
+              <button onClick={() => setLoading(true)} className="ink-btn ink-btn-ghost">
+                Open a saved page
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={onNew} className="ink-btn mt-8 text-xl">
+            Turn the page
+          </button>
+        )}
         <p className="mt-6 font-fell text-sm text-[#4a3326]/80">First playable slice · keyboard & mouse, gamepad or touch</p>
       </div>
       </div>
@@ -50,14 +75,14 @@ function Title({ onStart }: { onStart: () => void }) {
   )
 }
 
-function Play({ onQuit }: { onQuit: () => void }) {
+function Play({ initial, onQuit, onLoad }: { initial?: GameState; onQuit: () => void; onLoad: (slot: Slot) => void }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const [game, setGame] = useState<Game | null>(null)
   const [touch] = useState(isTouch)
   const [muted, setM] = useState(isMuted())
 
   useEffect(() => {
-    const g = new Game(canvas.current!)
+    const g = new Game(canvas.current!, initial)
     if (import.meta.env.DEV) (window as unknown as { __game: Game }).__game = g
     const fit = () => g.resize(window.innerWidth, window.innerHeight)
     fit()
@@ -75,13 +100,17 @@ function Play({ onQuit }: { onQuit: () => void }) {
       <canvas ref={canvas} className="absolute inset-0 h-full w-full" onClick={() => game?.lockPointer()} />
       <div className="paper-grain pointer-events-none fixed inset-0" />
       <div className="vignette pointer-events-none fixed inset-0" />
-      {game && <Overlay game={game} touch={touch} muted={muted} onMute={() => (setMuted(!isMuted()), setM(isMuted()))} onQuit={onQuit} />}
+      {game && <Overlay game={game} touch={touch} muted={muted} onMute={() => (setMuted(!isMuted()), setM(isMuted()))} onQuit={onQuit} onLoad={onLoad} />}
     </div>
   )
 }
 
-function Overlay({ game, touch, muted, onMute, onQuit }: { game: Game; touch: boolean; muted: boolean; onMute: () => void; onQuit: () => void }) {
+function Overlay({ game, touch, muted, onMute, onQuit, onLoad }: { game: Game; touch: boolean; muted: boolean; onMute: () => void; onQuit: () => void; onLoad: (slot: Slot) => void }) {
   const s = useSyncExternalStore(game.subscribe, game.getSnapshot)
+  const [panel, setPanel] = useState<'save' | 'load' | null>(null)
+  useEffect(() => {
+    if (!s.paused) setPanel(null)
+  }, [s.paused])
   const playing = !s.dialogue && !s.sheet && !s.paused && !s.dead
   return (
     <>
@@ -110,38 +139,52 @@ function Overlay({ game, touch, muted, onMute, onQuit }: { game: Game; touch: bo
       )}
       {s.paused && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-[#0e0b09]/70 p-4 fade-in">
-          <div className="page w-full max-w-lg p-6 sm:p-8">
+          <div className="page max-h-full w-full max-w-lg overflow-y-auto p-6 sm:p-8">
             <h2 className="text-center font-fell-sc text-3xl tracking-[0.2em] text-[#7a1f24]">Paused</h2>
-            <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-fell text-[#2b2118]">
-              {[
-                ['Move', 'WASD · arrows'],
-                ['Look', 'Mouse (click the world to capture it)'],
-                ['Run', 'Shift'],
-                ['Jump', 'Space'],
-                ['Strike', 'Left click'],
-                ['Block', 'Hold right click'],
-                ['Talk / use', 'E'],
-                ['Healing draught', 'Q'],
-                ['Character & journal', 'C · Tab'],
-                ['Gamepad', 'Sticks move/look · RT strike · LT block · A jump · B use · X draught · Y book'],
-              ].map(([k, v]) => (
-                <div key={k} className="contents">
-                  <dt className="font-fell-sc text-[#7a1f24]">{k}</dt>
-                  <dd>{v}</dd>
+            {panel ? (
+              <div className="mt-4">
+                <SaveSlots mode={panel} onPick={(slot) => (panel === 'save' ? game.save(slot) : onLoad(slot))} onBack={() => setPanel(null)} />
+              </div>
+            ) : (
+              <>
+                <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 font-fell text-[#2b2118]">
+                  {[
+                    ['Move', 'WASD · arrows'],
+                    ['Look', 'Mouse (click the world to capture it)'],
+                    ['Run', 'Shift'],
+                    ['Jump', 'Space'],
+                    ['Strike', 'Left click'],
+                    ['Block', 'Hold right click'],
+                    ['Talk / use', 'E'],
+                    ['Healing draught', 'Q'],
+                    ['Character & journal', 'C · Tab'],
+                    ['Gamepad', 'Sticks move/look · RT strike · LT block · A jump · B use · X draught · Y book'],
+                  ].map(([k, v]) => (
+                    <div key={k} className="contents">
+                      <dt className="font-fell-sc text-[#7a1f24]">{k}</dt>
+                      <dd>{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+                <div className="mt-6 flex flex-wrap justify-center gap-2">
+                  <button onClick={() => game.setPaused(false)} className="ink-btn">
+                    Resume
+                  </button>
+                  <button onClick={() => setPanel('save')} disabled={s.dead} className="ink-btn ink-btn-ghost disabled:opacity-40">
+                    Save
+                  </button>
+                  <button onClick={() => setPanel('load')} className="ink-btn ink-btn-ghost">
+                    Load
+                  </button>
+                  <button onClick={onMute} className="ink-btn ink-btn-ghost">
+                    {muted ? 'Unmute' : 'Mute'}
+                  </button>
+                  <button onClick={onQuit} className="ink-btn ink-btn-ghost">
+                    Close the book
+                  </button>
                 </div>
-              ))}
-            </dl>
-            <div className="mt-6 flex flex-wrap justify-center gap-2">
-              <button onClick={() => game.setPaused(false)} className="ink-btn">
-                Resume
-              </button>
-              <button onClick={onMute} className="ink-btn ink-btn-ghost">
-                {muted ? 'Unmute' : 'Mute'}
-              </button>
-              <button onClick={onQuit} className="ink-btn ink-btn-ghost">
-                Close the book
-              </button>
-            </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -150,15 +193,16 @@ function Overlay({ game, touch, muted, onMute, onQuit }: { game: Game; touch: bo
 }
 
 export default function App() {
-  const [playing, setPlaying] = useState(false)
-  if (!playing)
-    return (
-      <Title
-        onStart={() => {
-          initAudio()
-          setPlaying(true)
-        }}
-      />
-    )
-  return <Play onQuit={() => setPlaying(false)} />
+  // a new key remounts the game, so loading a save starts it afresh
+  const [session, setSession] = useState<{ key: number; state?: GameState } | null>(null)
+  const start = (state?: GameState) => {
+    initAudio()
+    setSession((s) => ({ key: (s?.key ?? 0) + 1, state }))
+  }
+  const load = (slot: Slot) => {
+    const state = readSave(slot)
+    if (state) start(state)
+  }
+  if (!session) return <Title onNew={() => start()} onLoad={load} />
+  return <Play key={session.key} initial={session.state} onQuit={() => setSession(null)} onLoad={load} />
 }

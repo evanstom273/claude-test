@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react'
-import type { Action, Input } from '../engine/input'
+import type { Action, Input } from '../engine/core/input'
 
 function Btn({ input, action, children, className = '' }: { input: Input; action: Action; children: ReactNode; className?: string }) {
   return (
