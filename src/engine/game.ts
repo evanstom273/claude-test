@@ -535,7 +535,7 @@ export class Game {
         break
       case 'leaveBarrow':
         // come out standing at the barrow's mouth, facing town
-        this.pendingSpawn = { x: 0, z: 86, yaw: 0 }
+        this.pendingSpawn = { x: 0, z: 84.8, yaw: 0 }
         this.travel('town')
         break
       case 'ring':
