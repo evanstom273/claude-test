@@ -191,12 +191,12 @@ export function cobbleTex(variant = '') {
   return svgTexture(`cobble${variant}`, svg(256, 256, s), { repeat: true })
 }
 
-export function dirtTex() {
+export function dirtTex(variant = '') {
   const r = rng(8)
   let s = `<rect width="256" height="256" fill="#b08a5a"/>`
   for (let i = 0; i < 20; i++) s += `<ellipse cx="${r() * 256}" cy="${r() * 256}" rx="${10 + r() * 30}" ry="${6 + r() * 14}" fill="#a07a4a" opacity="0.7"/>`
   for (let i = 0; i < 60; i++) s += `<circle cx="${r() * 256}" cy="${r() * 256}" r="${1 + r() * 2.5}" fill="#7a5a3a"/>`
-  return svgTexture('dirt', svg(256, 256, s), { repeat: true })
+  return svgTexture(`dirt${variant}`, svg(256, 256, s), { repeat: true })
 }
 
 export function flagstoneTex() {

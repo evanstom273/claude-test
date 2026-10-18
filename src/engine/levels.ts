@@ -233,24 +233,30 @@ export function buildTown(): Level {
   ground.receiveShadow = true
   lvl.group.add(ground)
 
-  const cobble = cobbleTex()
-  const street = new THREE.Mesh(new THREE.PlaneGeometry(6, 86), lambert(cobbleTex('street')))
-  street.rotation.x = -Math.PI / 2
-  street.position.set(0, 0.01, 0)
+  // Flat ground layers sit almost on top of each other, so each gets its own
+  // depth bias (higher layers always win) instead of fighting over pixels.
+  const flat = (mesh: THREE.Mesh, layer: number) => {
+    const m = mesh.material as THREE.MeshLambertMaterial
+    m.polygonOffset = true
+    m.polygonOffsetFactor = -layer
+    m.polygonOffsetUnits = -layer * 4
+    mesh.rotation.x = -Math.PI / 2
+    mesh.position.y = 0.005 * layer
+    mesh.receiveShadow = true
+    lvl.group.add(mesh)
+    return mesh
+  }
+  // dirt roads out of both gates, tucked just under the cobbles where they meet
+  const south = flat(new THREE.Mesh(new THREE.PlaneGeometry(4, 46), lambert(dirtTex('south'))), 1)
+  ;(south.material as THREE.MeshLambertMaterial).map!.repeat.set(1.3, 15)
+  south.position.z = 42 + 23
+  const north = flat(new THREE.Mesh(new THREE.PlaneGeometry(4, 60), lambert(dirtTex('north'))), 1)
+  ;(north.material as THREE.MeshLambertMaterial).map!.repeat.set(1.3, 20)
+  north.position.z = -42 - 30
+  const street = flat(new THREE.Mesh(new THREE.PlaneGeometry(6, 87), lambert(cobbleTex('street'))), 2)
   ;(street.material as THREE.MeshLambertMaterial).map!.repeat.set(2, 29)
-  street.receiveShadow = true
-  lvl.group.add(street)
-  const square = new THREE.Mesh(new THREE.CircleGeometry(14, 40), lambert(cobble))
+  const square = flat(new THREE.Mesh(new THREE.CircleGeometry(14, 40), lambert(cobbleTex())), 3)
   ;(square.material as THREE.MeshLambertMaterial).map!.repeat.set(9, 9)
-  square.rotation.x = -Math.PI / 2
-  square.position.y = 0.015
-  square.receiveShadow = true
-  lvl.group.add(square)
-  const road = new THREE.Mesh(new THREE.PlaneGeometry(4, 52), lambert(dirtTex()))
-  ;(road.material as THREE.MeshLambertMaterial).map!.repeat.set(1.3, 17)
-  road.rotation.x = -Math.PI / 2
-  road.position.set(0, 0.01, 68)
-  lvl.group.add(road)
 
   for (const b of BUILDINGS) building(b, lvl)
   townWalls(lvl)
@@ -354,40 +360,43 @@ export function buildTown(): Level {
     const d = 50 + r() * 80
     const x = Math.sin(a) * d
     const z = Math.cos(a) * d
-    if (Math.abs(x) < 7 && z > 40) continue
-    if (Math.hypot(x, z - 92) < 16) continue
+    if (Math.abs(x) < 7 && Math.abs(z) > 40) continue
+    if (Math.hypot(x, z - 96) < 17) continue
     const k = (['oak', 'pine', 'pine', 'birch', 'bush'] as const)[Math.floor(r() * 5)]
     const s = k === 'bush' ? 0.6 : 1
     addSprite(lvl, treeTex(k, i % 6), x, z, 6 * s * (0.8 + r() * 0.5), 12 * s * (0.8 + r() * 0.5), 2.2 * s)
     if (k !== 'bush') lvl.colliders.push(boxCollider(x, z, 0.8, 0.8))
   }
 
-  // the Hollow Barrow: a grassy mound with a stone mouth
+  // the Hollow Barrow: a grassy mound with a stone doorway built into its front
   const mound = new THREE.Mesh(new THREE.SphereGeometry(12, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), lambert(grassTex('mound')))
   ;(mound.material as THREE.MeshLambertMaterial).map!.repeat.set(8, 4)
   mound.scale.y = 0.45
-  mound.position.set(0, 0, 100)
+  mound.position.set(0, 0, 103)
   mound.castShadow = mound.receiveShadow = true
   lvl.group.add(mound)
-  lvl.colliders.push(boxCollider(0, 101, 20, 18))
+  lvl.colliders.push(boxCollider(0, 104, 20, 18))
   const stoneMat = lambert(stoneTex('#8a8278', '#7a7268', 13))
-  for (const x of [-1.8, 1.8]) {
-    const s = new THREE.Mesh(boxWU(0.9, 3.2, 0.9), stoneMat)
-    s.position.set(x, 1.6, 89.5)
-    s.castShadow = true
+  const slab = (x: number, y: number, z: number, w: number, h: number, d: number) => {
+    const s = new THREE.Mesh(boxWU(w, h, d), stoneMat)
+    s.position.set(x, y, z)
+    s.castShadow = s.receiveShadow = true
     lvl.group.add(s)
   }
-  const lintel = new THREE.Mesh(boxWU(4.8, 0.8, 1), stoneMat)
-  lintel.position.set(0, 3.5, 89.5)
-  lintel.castShadow = true
-  lvl.group.add(lintel)
-  const mouth = new THREE.Mesh(new THREE.PlaneGeometry(2.8, 3.1), new THREE.MeshBasicMaterial({ color: 0x0e0b09 }))
-  mouth.position.set(0, 1.55, 89.9)
+  // a short stone passage running from the doorway back into the hill
+  for (const x of [-1.9, 1.9]) slab(x, 1.65, 90.2, 0.8, 3.3, 4.4)
+  slab(0, 3.6, 90.2, 4.6, 0.6, 4.4)
+  // the standing stones and lintel framing the door, proud of the hillside
+  for (const x of [-1.9, 1.9]) slab(x, 1.9, 87.9, 1, 3.8, 1)
+  slab(0, 4.1, 87.9, 5.2, 0.9, 1.2)
+  const mouth = new THREE.Mesh(new THREE.PlaneGeometry(3, 3.3), new THREE.MeshBasicMaterial({ color: 0x0e0b09 }))
+  mouth.position.set(0, 1.65, 88.5)
   mouth.rotation.y = Math.PI
   lvl.group.add(mouth)
-  lvl.interactables.push({ id: 'enterBarrow', label: 'Enter the Hollow Barrow', x: 0, z: 88.6, radius: 2.4 })
-  addSprite(lvl, propTex('mushrooms'), -3.2, 88, 1.2, 0.7, 0)
-  addSprite(lvl, propTex('mushrooms'), 3.4, 88.8, 1, 0.6, 0)
+  lvl.colliders.push(boxCollider(0, 90.2, 4.6, 4.4))
+  lvl.interactables.push({ id: 'enterBarrow', label: 'Enter the Hollow Barrow', x: 0, z: 86.6, radius: 2.4 })
+  addSprite(lvl, propTex('mushrooms'), -3.4, 87.6, 1.2, 0.7, 0)
+  addSprite(lvl, propTex('mushrooms'), 3.6, 88.1, 1, 0.6, 0)
 
   backdrop(lvl)
 
