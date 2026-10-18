@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { DIALOGUE, ITEMS, levelDef, NPCS, PLAYER, PROPS, type NoteKind } from '../../data'
-import { travellerTex, type Outfit, type TravellerPose } from '../render/art'
+import { travellerTex, type Outfit, type TravellerPose, type TravellerSide } from '../render/art'
 import { Enemy, type EnemyEvent } from '../entities/enemy'
 import type { Entity, Tick } from '../entities/entity'
 import { EntityManager } from '../entities/manager'
@@ -134,7 +134,12 @@ export class Game implements RuleHost {
   view: View = readView()
   /** You, seen from behind, for third person. */
   avatar: Billboard
-  avatarPoses: Record<TravellerPose, THREE.Texture>
+  avatarPoses: Record<`${TravellerSide}-${TravellerPose}`, THREE.Texture>
+  /**
+   * Which way your body faces. In first person it's where you look; in third
+   * person the camera orbits freely and you turn to face the way you walk.
+   */
+  facing = 0
   /** Third-person camera distance, eased so it doesn't snap when a wall gets in the way. */
   camDist = CAM_DIST
 
@@ -158,8 +163,9 @@ export class Game implements RuleHost {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.camera.add(this.lantern)
     this.scene.add(this.camera)
-    this.avatarPoses = { idle: travellerTex(PLAYER.outfit, 'idle'), windup: travellerTex(PLAYER.outfit, 'windup'), strike: travellerTex(PLAYER.outfit, 'strike'), block: travellerTex(PLAYER.outfit, 'block') }
-    this.avatar = new Billboard(this.avatarPoses.idle, 1.05, 2.1, 0.45)
+    const poses: TravellerPose[] = ['idle', 'windup', 'strike', 'block']
+    this.avatarPoses = Object.fromEntries((['front', 'back'] as const).flatMap((side) => poses.map((pose) => [`${side}-${pose}`, travellerTex(PLAYER.outfit, pose, side)]))) as unknown as Game['avatarPoses']
+    this.avatar = new Billboard(this.avatarPoses['back-idle'], 1.05, 2.1, 0.45)
     this.scene.add(this.avatar.root)
     this.state = loaded ?? newGame()
     this.loadLevel(this.state.level)
@@ -167,6 +173,7 @@ export class Game implements RuleHost {
     if (at) {
       this.pos.set(at.x, at.y, at.z)
       this.yaw = at.yaw
+      this.facing = at.yaw
     }
     this.snapshot = this.buildSnapshot()
     this.note(loaded ? 'You pick up where you left off.' : PLAYER.note, 'info')
@@ -313,6 +320,7 @@ export class Game implements RuleHost {
     this.pos.set(s.x, 0, s.z)
     this.vel.set(0, 0, 0)
     this.yaw = s.yaw
+    this.facing = s.yaw
     this.pitch = 0
     const def = levelDef(id)
     this.lantern.intensity = def.lantern
@@ -351,6 +359,7 @@ export class Game implements RuleHost {
       if (this.pendingSpawn) {
         this.pos.set(this.pendingSpawn.x, 0, this.pendingSpawn.z)
         this.yaw = this.pendingSpawn.yaw
+        this.facing = this.yaw
         this.pendingSpawn = null
       }
       this.note(levelDef(this.pendingLevel).arrive)
@@ -395,7 +404,9 @@ export class Game implements RuleHost {
 
     const mv = look.readMove()
     this.blocking = look.held('block') && p.stamina > 0 && this.swing.phase === 'none'
-    const wantRun = look.held('run') && p.stamina > 1 && mv.y > 0.3 && !this.blocking
+    const third = this.view === 'third'
+    // in third person you can run any way the stick points; in first, only forwards
+    const wantRun = look.held('run') && p.stamina > 1 && (third ? Math.hypot(mv.x, mv.y) > 0.3 : mv.y > 0.3) && !this.blocking
     let speed = wantRun ? MOVE.run : MOVE.walk
     if (this.blocking) speed *= 0.5
     const fx = -Math.sin(this.yaw)
@@ -407,6 +418,13 @@ export class Game implements RuleHost {
     const k = Math.min(1, dt * (this.onGround ? 12 : 3))
     this.vel.x += (tx - this.vel.x) * k
     this.vel.z += (tz - this.vel.z) * k
+    if (!third || this.blocking) this.facing = this.yaw
+    else if (this.swing.phase === 'none' && Math.hypot(tx, tz) > 0.1) {
+      // turn to face the way you're walking
+      const want = Math.atan2(-tx, -tz)
+      const d = Math.atan2(Math.sin(want - this.facing), Math.cos(want - this.facing))
+      this.facing += d * Math.min(1, dt * 12)
+    }
 
     if (this.onGround && look.take('jump') && p.stamina > 5) {
       this.vel.y = MOVE.jump
@@ -500,7 +518,12 @@ export class Game implements RuleHost {
     a.root.visible = this.view === 'third'
     if (!a.root.visible) return
     const ph = this.swing.phase
-    a.setTexture(this.avatarPoses[ph === 'windup' ? 'windup' : ph === 'strike' || ph === 'recover' ? 'strike' : this.blocking ? 'block' : 'idle'])
+    const pose = ph === 'windup' ? 'windup' : ph === 'strike' || ph === 'recover' ? 'strike' : this.blocking ? 'block' : 'idle'
+    // show your face when the camera is in front of you
+    const toCamX = this.camera.position.x - this.pos.x
+    const toCamZ = this.camera.position.z - this.pos.z
+    const side = toCamX * -Math.sin(this.facing) + toCamZ * -Math.cos(this.facing) > 0 ? 'front' : 'back'
+    a.setTexture(this.avatarPoses[`${side}-${pose}`])
     a.root.position.copy(this.pos)
     a.face(this.camera.position)
     const moving = this.onGround && Math.hypot(this.vel.x, this.vel.z) > 0.5
@@ -512,6 +535,8 @@ export class Game implements RuleHost {
 
   toggleView() {
     this.view = this.view === 'first' ? 'third' : 'first'
+    // going back to first person, look the way you're facing
+    if (this.view === 'first') this.yaw = this.facing
     this.camDist = CAM_DIST
     try {
       localStorage.setItem(VIEW_KEY, this.view)
@@ -568,6 +593,8 @@ export class Game implements RuleHost {
       return
     }
     this.spend(COMBAT.stamina)
+    // a swing goes where the camera looks
+    this.facing = this.yaw
     this.swing = { phase: 'windup', t: 0, count: this.swing.count + 1 }
     sfx.swing()
     this.publish()
@@ -597,8 +624,8 @@ export class Game implements RuleHost {
   }
 
   private resolveSwing() {
-    const fx = -Math.sin(this.yaw)
-    const fz = -Math.cos(this.yaw)
+    const fx = -Math.sin(this.facing)
+    const fz = -Math.cos(this.facing)
     const blade = this.state.skills.blade.value
     let hitAny = false
     for (const e of this.entities.of(Enemy)) {
@@ -637,8 +664,8 @@ export class Game implements RuleHost {
     if (ev.type !== 'strike' || this.dead) return
     let dmg = ev.dmg ?? 5
     const e = ev.enemy
-    const fx = -Math.sin(this.yaw)
-    const fz = -Math.cos(this.yaw)
+    const fx = -Math.sin(this.facing)
+    const fz = -Math.cos(this.facing)
     const dx = e.x - this.pos.x
     const dz = e.z - this.pos.z
     const facing = (dx * fx + dz * fz) / (Math.hypot(dx, dz) || 1) > 0.35
@@ -706,6 +733,7 @@ export class Game implements RuleHost {
     this.loadLevel(r.level)
     this.pos.set(r.x, 0, r.z)
     this.yaw = r.yaw
+    this.facing = r.yaw
     this.fade = 1
     this.fadeTarget = 0
     this.note(r.note.replace('{lost}', String(lost)))

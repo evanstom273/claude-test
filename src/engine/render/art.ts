@@ -310,6 +310,26 @@ export interface Outfit {
 }
 
 /** A townsperson as a front-facing paper cut-out. viewBox 100x200, feet at the bottom. */
+/** A face with hair, hat and beard, looking at you. */
+function headSvg(o: Outfit, talking = false) {
+  const mouth = talking ? `<ellipse cx="50" cy="66" rx="4" ry="3" fill="${INK}"/>` : `<path d="M45 65 Q50 69 55 65" stroke="${INK}" stroke-width="2" fill="none"/>`
+  const beard = o.beard ? `<path d="M37 58 Q38 80 50 82 Q62 80 63 58 Q56 66 50 66 Q44 66 37 58Z" fill="${o.hair}" stroke="${INK}" stroke-width="1.5"/>` : ''
+  const hair = `<path d="M34 52 Q34 32 50 32 Q66 32 66 52 L64 44 Q50 38 36 44Z" fill="${o.hair}" stroke="${INK}" stroke-width="1.5"/>`
+  const hats: Record<Outfit['hat'], string> = {
+    none: '',
+    cap: `<path d="M34 46 Q36 30 50 30 Q64 30 66 46Z" fill="${o.trim}" stroke="${INK}" stroke-width="2"/><path d="M60 34 L74 28 L66 40Z" fill="#c94a3a" stroke="${INK}" stroke-width="1.5"/>`,
+    hood: `<path d="M30 70 Q26 26 50 24 Q74 26 70 70 L64 70 Q64 40 50 38 Q36 40 36 70Z" fill="${o.trim}" stroke="${INK}" stroke-width="2"/>`,
+    wide: `<ellipse cx="50" cy="42" rx="28" ry="6" fill="${o.trim}" stroke="${INK}" stroke-width="2"/><path d="M38 42 Q38 24 50 24 Q62 24 62 42Z" fill="${o.trim}" stroke="${INK}" stroke-width="2"/>`,
+    kerchief: `<path d="M33 48 Q34 30 50 30 Q66 30 67 48 L58 44 L50 50 L42 44Z" fill="${o.trim}" stroke="${INK}" stroke-width="2"/>`,
+    tall: `<path d="M38 44 L40 14 L60 14 L62 44Z" fill="#2b2b33" stroke="${INK}" stroke-width="2"/><ellipse cx="50" cy="44" rx="20" ry="4" fill="#2b2b33" stroke="${INK}" stroke-width="2"/><rect x="40" y="36" width="20" height="4" fill="#e0b04a"/>`,
+    helm: `<path d="M34 50 Q34 26 50 26 Q66 26 66 50 L60 50 L60 56 L40 56 L40 50Z" fill="#9aa0a8" stroke="${INK}" stroke-width="2"/><path d="M50 18 L50 28" stroke="#c94a3a" stroke-width="5"/>`,
+  }
+  return `<rect x="45" y="70" width="10" height="12" fill="${o.skin}" stroke="${INK}" stroke-width="1.5"/>
+  <ellipse cx="50" cy="54" rx="16" ry="18" fill="${o.skin}" stroke="${INK}" stroke-width="2"/>
+  ${hair}<circle cx="44" cy="54" r="2.2" fill="${INK}"/><circle cx="56" cy="54" r="2.2" fill="${INK}"/>
+  <circle cx="40" cy="60" r="3.5" fill="#e88a7a" opacity="0.55"/><circle cx="60" cy="60" r="3.5" fill="#e88a7a" opacity="0.55"/>${beard}${mouth}${hats[o.hat]}`
+}
+
 export function personSvg(o: Outfit, talking = false) {
   const legs = o.dress
     ? ''
@@ -324,22 +344,7 @@ export function personSvg(o: Outfit, talking = false) {
   <circle cx="24" cy="132" r="5" fill="${o.skin}" stroke="${INK}" stroke-width="1.5"/><circle cx="76" cy="132" r="5" fill="${o.skin}" stroke="${INK}" stroke-width="1.5"/>`
   const spear = o.spear ? `<path d="M84 196 L84 20" stroke="#6b4a2b" stroke-width="4"/><path d="M84 6 L90 22 L78 22Z" fill="#b8bcc0" stroke="${INK}" stroke-width="2"/>` : ''
   const basket = o.basket ? `<path d="M14 126 L36 126 L33 146 L17 146Z" fill="#b8903a" stroke="${INK}" stroke-width="2"/><path d="M16 126 Q25 112 34 126" stroke="${INK}" stroke-width="2" fill="none"/><circle cx="22" cy="124" r="4" fill="#d9584a"/><circle cx="29" cy="123" r="4" fill="#9cbb66"/>` : ''
-  const mouth = talking ? `<ellipse cx="50" cy="66" rx="4" ry="3" fill="${INK}"/>` : `<path d="M45 65 Q50 69 55 65" stroke="${INK}" stroke-width="2" fill="none"/>`
-  const beard = o.beard ? `<path d="M37 58 Q38 80 50 82 Q62 80 63 58 Q56 66 50 66 Q44 66 37 58Z" fill="${o.hair}" stroke="${INK}" stroke-width="1.5"/>` : ''
-  const hair = `<path d="M34 52 Q34 32 50 32 Q66 32 66 52 L64 44 Q50 38 36 44Z" fill="${o.hair}" stroke="${INK}" stroke-width="1.5"/>`
-  const hats: Record<Outfit['hat'], string> = {
-    none: '',
-    cap: `<path d="M34 46 Q36 30 50 30 Q64 30 66 46Z" fill="${o.trim}" stroke="${INK}" stroke-width="2"/><path d="M60 34 L74 28 L66 40Z" fill="#c94a3a" stroke="${INK}" stroke-width="1.5"/>`,
-    hood: `<path d="M30 70 Q26 26 50 24 Q74 26 70 70 L64 70 Q64 40 50 38 Q36 40 36 70Z" fill="${o.trim}" stroke="${INK}" stroke-width="2"/>`,
-    wide: `<ellipse cx="50" cy="42" rx="28" ry="6" fill="${o.trim}" stroke="${INK}" stroke-width="2"/><path d="M38 42 Q38 24 50 24 Q62 24 62 42Z" fill="${o.trim}" stroke="${INK}" stroke-width="2"/>`,
-    kerchief: `<path d="M33 48 Q34 30 50 30 Q66 30 67 48 L58 44 L50 50 L42 44Z" fill="${o.trim}" stroke="${INK}" stroke-width="2"/>`,
-    tall: `<path d="M38 44 L40 14 L60 14 L62 44Z" fill="#2b2b33" stroke="${INK}" stroke-width="2"/><ellipse cx="50" cy="44" rx="20" ry="4" fill="#2b2b33" stroke="${INK}" stroke-width="2"/><rect x="40" y="36" width="20" height="4" fill="#e0b04a"/>`,
-    helm: `<path d="M34 50 Q34 26 50 26 Q66 26 66 50 L60 50 L60 56 L40 56 L40 50Z" fill="#9aa0a8" stroke="${INK}" stroke-width="2"/><path d="M50 18 L50 28" stroke="#c94a3a" stroke-width="5"/>`,
-  }
-  const head = `<rect x="45" y="70" width="10" height="12" fill="${o.skin}" stroke="${INK}" stroke-width="1.5"/>
-  <ellipse cx="50" cy="54" rx="16" ry="18" fill="${o.skin}" stroke="${INK}" stroke-width="2"/>
-  ${hair}<circle cx="44" cy="54" r="2.2" fill="${INK}"/><circle cx="56" cy="54" r="2.2" fill="${INK}"/>
-  <circle cx="40" cy="60" r="3.5" fill="#e88a7a" opacity="0.55"/><circle cx="60" cy="60" r="3.5" fill="#e88a7a" opacity="0.55"/>${beard}${mouth}${hats[o.hat]}`
+  const head = headSvg(o, talking)
   const body2 = `<g filter="url(#cut)">${spear}${legs}${shoes}${body}${apron}${chain}${arms}${basket}${head}</g>`
   return svg(100, 200, body2, CUT)
 }
@@ -349,32 +354,43 @@ export function personTex(key: string, o: Outfit, talking = false) {
 }
 
 export type TravellerPose = 'idle' | 'windup' | 'strike' | 'block'
+export type TravellerSide = 'front' | 'back'
 
-/** The player seen from behind, for the third-person camera, sword in the right hand. */
-export function travellerSvg(o: Outfit, pose: TravellerPose) {
+/**
+ * The player as a paper figure for the third-person camera, sword in the right hand.
+ * Drawn as seen from behind; the front view is the same figure mirrored, with a face,
+ * and with the sword in front of the body instead of hidden behind it.
+ */
+export function travellerSvg(o: Outfit, pose: TravellerPose, side: TravellerSide) {
   const legs = `<rect x="38" y="140" width="10" height="46" fill="${o.legs}" stroke="${INK}" stroke-width="2"/><rect x="52" y="140" width="10" height="46" fill="${o.legs}" stroke="${INK}" stroke-width="2"/>`
   const shoes = `<path d="M34 186 L48 186 L48 194 L32 194Z M52 186 L66 186 L68 194 L52 194Z" fill="#3b2a1c" stroke="${INK}" stroke-width="2"/>`
   const body = `<path d="M34 80 L66 80 L70 146 L30 146Z" fill="${o.top}" stroke="${INK}" stroke-width="2.5"/><rect x="30" y="122" width="40" height="6" fill="${o.trim}" stroke="${INK}" stroke-width="1.5"/>`
   const leftArm = `<path d="M34 82 L24 86 L20 128 L28 128 L32 96Z" fill="${o.top}" stroke="${INK}" stroke-width="2"/><circle cx="24" cy="132" r="5" fill="${o.skin}" stroke="${INK}" stroke-width="1.5"/>`
   const blade = (x1: number, y1: number, x2: number, y2: number) => `<path d="M${x1} ${y1} L${x2} ${y2}" stroke="${INK}" stroke-width="8" stroke-linecap="round"/><path d="M${x1} ${y1} L${x2} ${y2}" stroke="#d8dce0" stroke-width="5" stroke-linecap="round"/>`
-  // the right arm and sword, per pose
+  // the right arm and sword, per pose, as seen from behind
   const right: Record<TravellerPose, string> = {
     idle: `${blade(78, 134, 92, 184)}<path d="M66 82 L76 86 L80 128 L72 128 L68 96Z" fill="${o.top}" stroke="${INK}" stroke-width="2"/><circle cx="77" cy="132" r="5" fill="${o.skin}" stroke="${INK}" stroke-width="1.5"/>`,
     windup: `${blade(84, 50, 74, 4)}<path d="M64 84 L74 80 L88 54 L80 50 L66 76Z" fill="${o.top}" stroke="${INK}" stroke-width="2"/><circle cx="84" cy="50" r="5" fill="${o.skin}" stroke="${INK}" stroke-width="1.5"/>`,
     strike: `<path d="M64 84 L74 82 L62 116 L54 112Z" fill="${o.top}" stroke="${INK}" stroke-width="2"/><circle cx="58" cy="116" r="5" fill="${o.skin}" stroke="${INK}" stroke-width="1.5"/>${blade(58, 116, 14, 140)}`,
     block: `<path d="M64 84 L74 82 L80 96 L72 100Z" fill="${o.top}" stroke="${INK}" stroke-width="2"/><circle cx="78" cy="98" r="5" fill="${o.skin}" stroke="${INK}" stroke-width="1.5"/>${blade(90, 100, 12, 66)}`,
   }
-  // the back of the head: hair, or a hood pulled up
-  const head =
+  // a sword at your side stays visible either way; held up or across you, the body hides it from behind
+  const sword = right[pose]
+  const swordInFront = pose === 'idle' || side === 'front'
+  const backHead =
     o.hat === 'hood'
       ? `<path d="M30 74 Q26 26 50 24 Q74 26 70 74 Q50 82 30 74Z" fill="${o.trim}" stroke="${INK}" stroke-width="2"/>`
       : `<rect x="45" y="70" width="10" height="12" fill="${o.skin}" stroke="${INK}" stroke-width="1.5"/><ellipse cx="50" cy="54" rx="16" ry="18" fill="${o.hair}" stroke="${INK}" stroke-width="2"/>`
-  const swordBehind = pose === 'block' || pose === 'idle'
-  const g = `<g filter="url(#cut)">${legs}${shoes}${body}${leftArm}${swordBehind ? '' : head}${right[pose]}${swordBehind ? head : ''}</g>`
+  const head = side === 'back' ? backHead : headSvg(o)
+  const figure = `${legs}${shoes}${swordInFront ? '' : sword}${body}${leftArm}`
+  const g =
+    side === 'back'
+      ? `<g filter="url(#cut)">${figure}${head}${swordInFront ? sword : ''}</g>`
+      : `<g filter="url(#cut)"><g transform="translate(100 0) scale(-1 1)">${figure}</g>${head}<g transform="translate(100 0) scale(-1 1)">${sword}</g></g>`
   return svg(100, 200, g, CUT)
 }
 
-export const travellerTex = (o: Outfit, pose: TravellerPose) => svgTexture(`traveller-${pose}`, travellerSvg(o, pose), { w: 200, h: 400, grain: 0.25 })
+export const travellerTex = (o: Outfit, pose: TravellerPose, side: TravellerSide) => svgTexture(`traveller-${side}-${pose}`, travellerSvg(o, pose, side), { w: 200, h: 400, grain: 0.25 })
 
 export type SkeletonFrame = 'idle' | 'windup' | 'strike' | 'hurt'
 
