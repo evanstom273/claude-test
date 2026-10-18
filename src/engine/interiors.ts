@@ -241,6 +241,8 @@ export function buildInterior(b: Building): Level {
   // ---- dividing walls with doorways, avoiding the stairs and the front door
   const rooms: Room[] = []
   function divide(region: Rect, floorN: number, avoid: Rect[], maxSplits: number) {
+    // downstairs walls stop just under the floorboards above instead of poking through them
+    const wallH = storeys > 1 && floorN === 0 ? F - 0.18 : F
     const out: Rect[] = [region]
     for (let split = 0; split < maxSplits; split++) {
       out.sort((a, c) => area(c) - area(a))
@@ -273,12 +275,12 @@ export function buildInterior(b: Building): Level {
         if (avoid.some((a) => overlaps(gapRect, a))) continue
         for (const p of solidParts) {
           if (p.x1 - p.x0 < 0.05 || p.z1 - p.z0 < 0.05) continue
-          wall((p.x0 + p.x1) / 2, (p.z0 + p.z1) / 2, p.x1 - p.x0, p.z1 - p.z0, floorN * F, F)
+          wall((p.x0 + p.x1) / 2, (p.z0 + p.z1) / 2, p.x1 - p.x0, p.z1 - p.z0, floorN * F, wallH)
         }
         // a lintel over the doorway
         const gx = alongX ? big.x0 + gapAt + 0.6 : at
         const gz = alongX ? at : big.z0 + gapAt + 0.6
-        wall(gx, gz, alongX ? 1.2 : WALL_T, alongX ? WALL_T : 1.2, floorN * F + 2.3, F - 2.3, wallMat, false)
+        wall(gx, gz, alongX ? 1.2 : WALL_T, alongX ? WALL_T : 1.2, floorN * F + 2.3, wallH - 2.3, wallMat, false)
         keepouts.push({ x0: gapRect.x0, x1: gapRect.x1, z0: gapRect.z0, z1: gapRect.z1, floor: floorN })
         out.shift()
         out.push(alongX ? { ...big, z1: at - WALL_T / 2 } : { ...big, x1: at - WALL_T / 2 }, alongX ? { ...big, z0: at + WALL_T / 2 } : { ...big, x0: at + WALL_T / 2 })
