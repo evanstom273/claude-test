@@ -29,6 +29,18 @@ npm run build
 
 React, Vite, TypeScript, Tailwind CSS and three.js. All art is generated SVG baked into textures at runtime. Pushes to `main` deploy to GitHub Pages via `.github/workflows/deploy.yml`.
 
+### Layout
+
+- `src/data/` — the game's content as JSON resources (Godot `.tres` style): people, places, buildings, enemies, items, quests, dialogue, usable props, levels and the starting player. `types.ts` describes each file; `index.ts` loads them and checks every cross-reference at startup.
+- `src/engine/core/` — the game loop (`game.ts`), the saveable `GameState` (`state.ts`), save slots (`save.ts`), input and audio.
+- `src/engine/entities/` — `Entity` and `EntityManager`, plus `Npc`, `Enemy` and `Prop`.
+- `src/engine/systems/` — the rules interpreter (conditions and effects used by dialogue and props), dialogue, time.
+- `src/engine/world/` — level, interior and sky building, collision.
+- `src/engine/render/` — SVG texture generation.
+- `src/ui/` — HUD, books, save slots, touch controls.
+
+Dialogue topics and props are lists of rules: the first whose `when` holds runs its `do` effects (`give`, `gold`, `quest`, `journal`, `travel`, `if`…). Saves go to `localStorage`: three slots plus an autosave on every change of level.
+
 ## Archive
 
 Earlier experiments live on their own branches: [`archive/hollow-orchard`](https://github.com/evanstom273/claude-test/tree/archive/hollow-orchard) and [`archive/emberwake`](https://github.com/evanstom273/claude-test/tree/archive/emberwake).

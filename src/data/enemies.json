@@ -1,0 +1,40 @@
+{
+  "rat": {
+    "hp": 12,
+    "speed": 3.4,
+    "range": 1.3,
+    "windup": 0.38,
+    "strike": 0.15,
+    "recover": 0.55,
+    "dmg": [3, 6],
+    "sight": 9,
+    "w": 0.9,
+    "h": 0.9,
+    "gold": [0, 3],
+    "name": "rat",
+    "radius": 0.3,
+    "flinch": true,
+    "gait": 16,
+    "bob": 0.06,
+    "tell": "squeak"
+  },
+  "skeleton": {
+    "hp": 38,
+    "speed": 2.3,
+    "range": 1.9,
+    "windup": 0.68,
+    "strike": 0.2,
+    "recover": 0.95,
+    "dmg": [9, 13],
+    "sight": 13,
+    "w": 1.15,
+    "h": 2.3,
+    "gold": [4, 14],
+    "name": "skeleton",
+    "radius": 0.4,
+    "flinch": false,
+    "gait": 8,
+    "bob": 0.1,
+    "tell": "bones"
+  }
+}

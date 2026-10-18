@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { HudState } from '../engine/game'
+import type { HudState } from '../engine/core/game'
 
 function Bar({ value, max, color, width }: { value: number; max: number; color: string; width: number }) {
   return (

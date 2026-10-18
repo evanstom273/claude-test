@@ -1,0 +1,53 @@
+{
+  "door": { "label": "Enter {building}", "use": [{"do": [{"travel": "in:{id}"}]}] },
+  "exit": { "label": "Leave {building}", "use": [{"do": [{"exitBuilding": true}]}] },
+  "enterBarrow": {
+    "label": "Enter the Hollow Barrow",
+    "use": [
+      {
+        "do": [
+          {
+            "if": { "quest": {"signet": "none"} },
+            "do": [{"note": "A cold draught breathes out of the barrow. You go in anyway."}]
+          },
+          { "travel": "barrow" }
+        ]
+      }
+    ]
+  },
+  "leaveBarrow": { "label": "Climb back up to daylight", "use": [{"do": [{"travel": "town", "at": {"x": 0, "z": 84.8, "yaw": 0}}]}] },
+  "ring": {
+    "label": "Take the Reeve's signet",
+    "gone": { "flag": "taken:ring" },
+    "use": [
+      {
+        "do": [
+          { "remove": true },
+          { "flag": "taken:ring" },
+          { "give": "signet" },
+          {
+            "if": { "quest": {"signet": ["none", "accepted"]} },
+            "do": [
+              { "quest": "signet", "stage": "found" },
+              {
+                "journal": "Found the Reeve's signet beside what was left of Jory Quickfingers. Return it to Aldous Penhallow in Brindle."
+              },
+              { "note": "You take the Reeve's signet.", "kind": "quest" },
+              { "sfx": "quest" }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "jory": {
+    "label": "Search the body",
+    "use": [
+      { "when": {"flag": "searched:jory"}, "say": "Jory has nothing else to give. Poor Jory." },
+      {
+        "do": [{"flag": "searched:jory"}, {"gold": 6}, {"sfx": "coin"}],
+        "say": "A crumpled note in Jory's coat: 'Fence the ring in Coldharbour. Tell nobody. ESPECIALLY not Mother Tansy.' And 6 gold."
+      }
+    ]
+  }
+}

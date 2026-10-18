@@ -1,0 +1,8 @@
+[
+  { "id": "goose", "name": "the Gilded Goose", "x": -9, "z": -24 },
+  { "id": "hall", "name": "the Reeve's Hall", "x": 10, "z": -24 },
+  { "id": "temple", "name": "the Temple of the Lantern", "x": 18, "z": 6 },
+  { "id": "smithy", "name": "Hobb's smithy", "x": -16, "z": 8 },
+  { "id": "market", "name": "the market", "x": 0, "z": 2 },
+  { "id": "barrow", "name": "the Hollow Barrow", "x": 0, "z": 92 }
+]

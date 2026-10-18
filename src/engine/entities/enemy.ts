@@ -1,114 +1,10 @@
 import * as THREE from 'three'
-import { personTex, ratTex, skeletonTex } from './art'
-import type { NpcDef } from './dialogue'
-import { Billboard, resolveCircle, segmentBlocked, type Collider } from './geo'
+import { ENEMIES, type EnemyDef, type EnemyKind } from '../../data'
+import { ratTex, skeletonTex } from '../render/art'
+import { Billboard, resolveCircle, segmentBlocked } from '../world/geo'
+import { Entity, type Tick } from './entity'
 
-export class Npc {
-  sprite: Billboard
-  idle: THREE.Texture
-  talking: THREE.Texture
-  x: number
-  z: number
-  target: { x: number; z: number } | null = null
-  wait = Math.random() * 3
-  walk = 0
-  talkingTo = false
-  mouth = 0
-
-  home: { x: number; z: number }
-
-  constructor(
-    public def: NpcDef,
-    home?: { x: number; z: number },
-  ) {
-    this.home = home ?? def.home
-    this.idle = personTex(`npc-${def.id}`, def.outfit)
-    this.talking = personTex(`npc-${def.id}`, def.outfit, true)
-    this.sprite = new Billboard(this.idle, 1.05, 2.1, 0.45)
-    this.x = this.home.x
-    this.z = this.home.z
-    this.sprite.root.position.set(this.x, 0, this.z)
-  }
-
-  update(dt: number, cols: Collider[], time: number) {
-    if (this.talkingTo) {
-      // flaps its paper mouth while you read
-      this.mouth += dt
-      this.sprite.setTexture(Math.floor(this.mouth * 6) % 2 && this.mouth < 2.5 ? this.talking : this.idle)
-      this.sprite.mesh.position.y = 0
-      this.sprite.mesh.rotation.z = 0
-      return
-    }
-    this.sprite.setTexture(this.idle)
-    if (this.def.wander > 0) {
-      if (!this.target) {
-        this.wait -= dt
-        if (this.wait <= 0) {
-          const a = Math.random() * Math.PI * 2
-          const d = Math.random() * this.def.wander
-          this.target = { x: this.home.x + Math.cos(a) * d, z: this.home.z + Math.sin(a) * d }
-        }
-      } else {
-        const dx = this.target.x - this.x
-        const dz = this.target.z - this.z
-        const d = Math.hypot(dx, dz)
-        if (d < 0.2) {
-          this.target = null
-          this.wait = 2 + Math.random() * 5
-        } else {
-          const sp = 1.1 * dt
-          const p = { x: this.x + (dx / d) * sp, z: this.z + (dz / d) * sp }
-          resolveCircle(p, 0.35, cols)
-          if (Math.hypot(p.x - this.x, p.z - this.z) < sp * 0.3) {
-            this.target = null
-            this.wait = 1
-          }
-          this.x = p.x
-          this.z = p.z
-          this.walk += dt * 7
-        }
-      }
-    }
-    // a paper figure's walk: a bob and a rock from side to side
-    const moving = this.target ? 1 : 0
-    this.sprite.mesh.position.y = moving * Math.abs(Math.sin(this.walk)) * 0.08
-    this.sprite.mesh.rotation.z = moving * Math.sin(this.walk) * 0.05 + Math.sin(time * 1.3 + this.home.x) * 0.01
-    this.sprite.root.position.set(this.x, 0, this.z)
-  }
-
-  startTalking() {
-    this.talkingTo = true
-    this.mouth = 0
-    this.target = null
-  }
-
-  stopTalking() {
-    this.talkingTo = false
-    this.wait = 2
-  }
-}
-
-export type EnemyKind = 'rat' | 'skeleton'
 type EState = 'idle' | 'chase' | 'windup' | 'strike' | 'recover' | 'hurt' | 'dead'
-
-export interface EnemyStats {
-  hp: number
-  speed: number
-  range: number
-  windup: number
-  strike: number
-  recover: number
-  dmg: [number, number]
-  sight: number
-  w: number
-  h: number
-  gold: [number, number]
-}
-
-export const ENEMY: Record<EnemyKind, EnemyStats> = {
-  rat: { hp: 12, speed: 3.4, range: 1.3, windup: 0.38, strike: 0.15, recover: 0.55, dmg: [3, 6], sight: 9, w: 0.9, h: 0.9, gold: [0, 3] },
-  skeleton: { hp: 38, speed: 2.3, range: 1.9, windup: 0.68, strike: 0.2, recover: 0.95, dmg: [9, 13], sight: 13, w: 1.15, h: 2.3, gold: [4, 14] },
-}
 
 export interface EnemyEvent {
   type: 'strike' | 'tele' | 'death'
@@ -116,14 +12,13 @@ export interface EnemyEvent {
   dmg?: number
 }
 
-export class Enemy {
+export class Enemy extends Entity {
+  readonly kind = 'enemy'
   sprite: Billboard
-  stats: EnemyStats
+  stats: EnemyDef
   hp: number
   state: EState = 'idle'
   t = 0
-  x: number
-  z: number
   vx = 0
   vz = 0
   cooldown = 0
@@ -133,18 +28,31 @@ export class Enemy {
   looted = false
   frames: Record<string, THREE.Texture>
 
-  constructor(public kind: EnemyKind, x: number, z: number) {
-    this.stats = ENEMY[kind]
+  constructor(
+    public type: EnemyKind,
+    x: number,
+    z: number,
+  ) {
+    super()
+    this.stats = ENEMIES[type]
     this.hp = this.stats.hp
     this.x = x
     this.z = z
     this.frames =
-      kind === 'rat'
+      type === 'rat'
         ? { idle: ratTex('idle'), windup: ratTex('bite'), strike: ratTex('bite'), hurt: ratTex('hurt') }
         : { idle: skeletonTex('idle'), windup: skeletonTex('windup'), strike: skeletonTex('strike'), hurt: skeletonTex('hurt') }
     this.sprite = new Billboard(this.frames.idle, this.stats.w, this.stats.h, this.stats.w * 0.4)
     this.sprite.mat.emissive = new THREE.Color(0x000000)
     this.sprite.root.position.set(x, 0, z)
+  }
+
+  get root() {
+    return this.sprite.root
+  }
+
+  face(cam: THREE.Vector3) {
+    this.sprite.face(cam)
   }
 
   get alive() {
@@ -166,14 +74,16 @@ export class Enemy {
       return true
     }
     // rats flinch out of their bite; skeletons commit to the swing
-    if (this.kind === 'rat' || this.state !== 'windup') {
+    if (this.stats.flinch || this.state !== 'windup') {
       this.state = 'hurt'
       this.t = 0
     }
     return false
   }
 
-  update(dt: number, px: number, pz: number, cols: Collider[], events: EnemyEvent[]) {
+  update(dt: number, w: Tick) {
+    if (w.paused || w.talking) return
+    const { px, pz, colliders: cols, events } = w
     const s = this.stats
     this.t += dt
     this.flash = Math.max(0, this.flash - dt)
@@ -229,14 +139,14 @@ export class Enemy {
     if (move > 0 && d > 0.01) {
       this.vx += ((dx / d) * move - this.vx) * Math.min(1, dt * 8)
       this.vz += ((dz / d) * move - this.vz) * Math.min(1, dt * 8)
-      this.walk += dt * (this.kind === 'rat' ? 16 : 8)
+      this.walk += dt * s.gait
     } else {
       this.vx *= Math.exp(-8 * dt)
       this.vz *= Math.exp(-8 * dt)
     }
     if (this.alive) {
       const p = { x: this.x + this.vx * dt, z: this.z + this.vz * dt }
-      resolveCircle(p, this.kind === 'rat' ? 0.3 : 0.4, cols)
+      resolveCircle(p, s.radius, cols)
       this.x = p.x
       this.z = p.z
     }
@@ -246,7 +156,7 @@ export class Enemy {
     this.sprite.setTexture(this.frames[frame])
     this.sprite.mat.emissive.setScalar(this.flash > 0 ? 0.8 : 0)
     const moving = move > 0
-    this.sprite.mesh.position.y = moving ? Math.abs(Math.sin(this.walk)) * (this.kind === 'rat' ? 0.06 : 0.1) : 0
+    this.sprite.mesh.position.y = moving ? Math.abs(Math.sin(this.walk)) * s.bob : 0
     this.sprite.mesh.rotation.z = moving ? Math.sin(this.walk) * 0.06 : this.state === 'windup' ? Math.sin(this.t * 60) * 0.012 : 0
     if (this.state === 'dead') {
       // the cut-out tips over backwards and lies flat
