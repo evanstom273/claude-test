@@ -134,13 +134,52 @@ export interface Collider {
   maxX: number
   minZ: number
   maxZ: number
+  /** Vertical extent; omitted means floor to sky. */
+  y0?: number
+  y1?: number
+}
+
+/**
+ * Something you can stand on above the ground: a floor (flat) or a stair
+ * (a ramp rising along x or z from `y0` at the min edge to `y1` at the max).
+ */
+export interface Surface {
+  minX: number
+  maxX: number
+  minZ: number
+  maxZ: number
+  y0: number
+  y1?: number
+  axis?: 'x' | 'z'
+}
+
+/** How far up a step you can walk without jumping. */
+export const STEP_UP = 0.45
+
+export function surfaceHeight(s: Surface, x: number, z: number) {
+  if (!s.axis || s.y1 === undefined) return s.y0
+  const k = s.axis === 'x' ? (x - s.minX) / (s.maxX - s.minX) : (z - s.minZ) / (s.maxZ - s.minZ)
+  return s.y0 + (s.y1 - s.y0) * Math.max(0, Math.min(1, k))
+}
+
+/** The highest floor under (x, z) that is no more than a step above `y`. */
+export function supportAt(surfaces: Surface[] | undefined, x: number, z: number, y: number) {
+  let best = 0
+  if (!surfaces) return best
+  for (const s of surfaces) {
+    if (x < s.minX || x > s.maxX || z < s.minZ || z > s.maxZ) continue
+    const h = surfaceHeight(s, x, z)
+    if (h <= y + STEP_UP && h > best) best = h
+  }
+  return best
 }
 
 export const boxCollider = (x: number, z: number, w: number, d: number): Collider => ({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 })
 
-/** Pushes a circle out of every box it overlaps. */
-export function resolveCircle(p: { x: number; z: number }, r: number, cols: Collider[]) {
+/** Pushes a circle out of every box it overlaps at the given height. */
+export function resolveCircle(p: { x: number; z: number }, r: number, cols: Collider[], y = 0, height = 1.7) {
   for (const c of cols) {
+    if ((c.y1 ?? Infinity) <= y + STEP_UP || (c.y0 ?? -Infinity) >= y + height) continue
     const cx = Math.max(c.minX, Math.min(c.maxX, p.x))
     const cz = Math.max(c.minZ, Math.min(c.maxZ, p.z))
     const dx = p.x - cx

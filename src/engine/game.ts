@@ -3,9 +3,10 @@ import { sfx, setAmbience } from './audio'
 import type { Outfit } from './art'
 import { directions, NPCS, PLACES, rumour, type QuestStage } from './dialogue'
 import { Enemy, Npc, type EnemyEvent } from './entities'
-import { resolveCircle } from './geo'
+import { resolveCircle, supportAt } from './geo'
+import { buildInterior, doorWorld } from './interiors'
 import { Input } from './input'
-import { buildBarrow, buildTown, type Interactable, type Level, type LevelId } from './levels'
+import { asBuilding, buildBarrow, buildTown, BUILDINGS, type Interactable, type Level, type LevelId } from './levels'
 
 export interface Topic {
   id: string
@@ -239,7 +240,7 @@ export class Game {
       moving: Math.hypot(this.vel.x, this.vel.z) > 0.5 && this.onGround,
       running: Math.hypot(this.vel.x, this.vel.z) > WALK + 0.5,
       hurt: this.hurtCount,
-      location: this.level.id === 'town' ? 'Brindle' : 'The Hollow Barrow',
+      location: this.level.title ?? (this.level.id === 'town' ? 'Brindle' : 'The Hollow Barrow'),
       journal: this.journal,
       skills: this.skills.map((s) => ({ ...s })),
       items: this.items,
@@ -272,11 +273,15 @@ export class Game {
     for (const e of this.enemies) this.scene.remove(e.sprite.root)
     this.npcs = []
     this.enemies = []
-    this.level = id === 'town' ? buildTown() : buildBarrow()
+    const bdef = id.startsWith('in:') ? BUILDINGS.find((b) => `in:${b.id}` === id) : null
+    this.level = id === 'town' ? buildTown() : bdef ? buildInterior(asBuilding(bdef)) : buildBarrow()
     this.scene.add(this.level.group)
-    if (id === 'town') {
+    if (id === 'town' || bdef) {
+      // everyone lives somewhere: out in town, or inside at their post
       for (const def of NPCS) {
-        const n = new Npc(def)
+        if ((def.inside ?? null) !== (bdef?.id ?? null)) continue
+        const spot = def.spot ? this.level.spots?.[def.spot] : undefined
+        const n = new Npc(def, spot ?? (bdef ? { x: 0, z: 0 } : undefined))
         this.npcs.push(n)
         this.scene.add(n.sprite.root)
       }
@@ -298,11 +303,14 @@ export class Game {
     this.vel.set(0, 0, 0)
     this.yaw = s.yaw
     this.pitch = 0
-    this.lantern.intensity = this.level.outdoors ? 0 : 4.5
+    this.lantern.intensity = id === 'barrow' ? 4.5 : 0
     setAmbience(this.level.outdoors)
-    if (!this.level.outdoors) {
+    if (id === 'barrow') {
       this.scene.background = new THREE.Color(0x0e0b09)
       this.scene.fog = new THREE.Fog(0x0e0b09, 3, 24)
+    } else if (bdef) {
+      this.scene.background = new THREE.Color(0x1a120c)
+      this.scene.fog = null
     }
   }
 
@@ -396,17 +404,20 @@ export class Game {
     }
     this.vel.y -= 15 * dt
     const p = { x: this.pos.x + this.vel.x * dt, z: this.pos.z + this.vel.z * dt }
-    resolveCircle(p, RADIUS, this.level.colliders)
+    resolveCircle(p, RADIUS, this.level.colliders, this.pos.y)
     const moved = Math.hypot(p.x - this.pos.x, p.z - this.pos.z)
     this.pos.x = p.x
     this.pos.z = p.z
+    // floors, stairs and daises: step up onto them, follow them down, fall off edges
+    const support = supportAt(this.level.surfaces, this.pos.x, this.pos.z, this.pos.y)
+    const wasGround = this.onGround
     this.pos.y += this.vel.y * dt
-    if (this.pos.y <= 0) {
-      if (!this.onGround && this.vel.y < -6) sfx.step(true)
-      this.pos.y = 0
+    if (this.pos.y <= support || (wasGround && this.vel.y <= 0 && this.pos.y - support < 0.35)) {
+      if (!wasGround && this.vel.y < -6) sfx.step(true)
+      this.pos.y = support
       this.vel.y = 0
       this.onGround = true
-    }
+    } else this.onGround = false
 
     // stamina: running drains it, standing still restores it
     if (wantRun && moved > 0.01) {
@@ -453,8 +464,11 @@ export class Game {
 
   private updateSky() {
     const lvl = this.level
-    if (!lvl.outdoors || !lvl.sun || !lvl.hemi) return
     const hour = this.minutes / 60
+    const night = hour < 6.5 || hour > 19.5
+    for (const l of lvl.nightLights) l.mesh.material = night ? l.night : l.day
+    if (lvl.buildingId && lvl.hemi) lvl.hemi.intensity = night ? 0.45 : 0.95
+    if (!lvl.outdoors || !lvl.sun || !lvl.hemi) return
     const s = skyAt(hour)
     this.scene.background = s.color
     if (!(this.scene.fog instanceof THREE.Fog)) this.scene.fog = new THREE.Fog(s.color, 70, 300)
@@ -481,8 +495,6 @@ export class Game {
         c.lookAt(this.camera.position.x, c.position.y, this.camera.position.z)
       }
     }
-    const night = hour < 6.5 || hour > 19.5
-    for (const l of lvl.nightLights) l.mesh.material = night ? l.night : l.day
   }
 
   // -------------------------------------------------------------- interaction
@@ -506,6 +518,7 @@ export class Game {
       return d - dot
     }
     for (const n of this.npcs) {
+      if (this.pos.y > 1.2) continue
       const sc = consider(n.x, n.z, 3)
       if (sc < bestScore) {
         bestScore = sc
@@ -513,6 +526,7 @@ export class Game {
       }
     }
     for (const it of this.level.interactables) {
+      if (Math.abs(this.pos.y - (it.y ?? 0)) > 1.2) continue
       const sc = consider(it.x, it.z, it.radius + 1)
       if (sc < bestScore) {
         bestScore = sc
@@ -528,7 +542,21 @@ export class Game {
     if (!f) return
     if (f.kind === 'npc') return this.talk(f.npc)
     const it = f.it
+    if (it.id.startsWith('door:')) {
+      this.travel(`in:${it.id.slice(5)}`)
+      return
+    }
     switch (it.id) {
+      case 'exit': {
+        // step back out into the street, facing away from the door
+        const b = BUILDINGS.find((x) => x.id === this.level.buildingId)
+        if (b) {
+          const { out } = doorWorld(asBuilding(b))
+          this.pendingSpawn = { x: out.x, z: out.z, yaw: out.yaw }
+        }
+        this.travel('town')
+        break
+      }
       case 'enterBarrow':
         if (this.quest === 'none') this.note('A cold draught breathes out of the barrow. You go in anyway.')
         this.travel('barrow')
@@ -685,9 +713,9 @@ export class Game {
     this.gold -= lost
     this.hp = this.maxHp
     this.stamina = this.maxStamina
-    this.loadLevel('town')
-    this.pos.set(18, 0, 6)
-    this.yaw = Math.PI / 2
+    this.loadLevel('in:temple')
+    this.pos.set(0, 0, 0.5)
+    this.yaw = 0
     this.fade = 1
     this.fadeTarget = 0
     this.note(`You wake on the cold floor of the Temple of the Lantern. Sister Ide took ${lost} gold for her trouble.`)
@@ -774,7 +802,9 @@ export class Game {
     }
     if (topicId.startsWith('place:')) {
       const p = PLACES.find((x) => `place:${x.id}` === topicId)!
-      return this.setDialogue(n, directions(n.x, n.z, p))
+      const b = BUILDINGS.find((x) => x.id === this.level.buildingId)
+      const from = b ? doorWorld(asBuilding(b)).door : { x: n.x, z: n.z }
+      return this.setDialogue(n, directions(from.x, from.z, p))
     }
     switch (topicId) {
       case 'bye':

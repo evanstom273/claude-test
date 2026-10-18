@@ -13,6 +13,9 @@ export interface NpcDef {
   /** How far from home they wander; 0 stands still. */
   wander: number
   greeting: string[]
+  /** If set, they live inside this building, at the named spot. */
+  inside?: string
+  spot?: string
 }
 
 export interface Place {
@@ -40,8 +43,10 @@ export const NPCS: NpcDef[] = [
     title: 'Reeve of Brindle',
     role: 'reeve',
     outfit: { skin: SKIN[0], hair: '#9a9a9a', top: '#3a3a6a', trim: '#e0b04a', legs: '#2b2b33', hat: 'tall', beard: true, chain: true },
-    home: { x: 6, z: -24 },
-    wander: 1.5,
+    home: { x: 0, z: 0 },
+    wander: 0.6,
+    inside: 'hall',
+    spot: 'reeve',
     greeting: ['Ah. A traveller. Splendid. Do you happen to be any good at finding things?', 'Yes, yes, what is it? I am a very busy man. Extremely busy. Mostly worrying.'],
   },
   {
@@ -50,8 +55,10 @@ export const NPCS: NpcDef[] = [
     title: 'keeper of the Gilded Goose',
     role: 'innkeeper',
     outfit: { skin: SKIN[1], hair: '#6b3a2a', top: '#a84a3a', trim: '#f4ecd6', legs: '#5a3d26', hat: 'kerchief', dress: true, apron: true },
-    home: { x: -6, z: -22 },
-    wander: 1,
+    home: { x: 0, z: 0 },
+    wander: 0.5,
+    inside: 'goose',
+    spot: 'keeper',
     greeting: ['Come in out of the weather, love. Well. Stand near the door, anyway.', "You look like you've walked a long way. You look like you've walked it badly, too."],
   },
   {
@@ -90,8 +97,10 @@ export const NPCS: NpcDef[] = [
     title: 'of the Temple of the Lantern',
     role: 'priest',
     outfit: { skin: SKIN[0], hair: '#2b2118', top: '#f4ecd6', trim: '#e0b04a', legs: '#f4ecd6', hat: 'hood', dress: true },
-    home: { x: 13, z: 6 },
-    wander: 1.5,
+    home: { x: 0, z: 0 },
+    wander: 1,
+    inside: 'temple',
+    spot: 'ide',
     greeting: ['The Lantern keeps you, child. Mostly. Within reason.', 'Light and warmth to you. You smell of the road.'],
   },
   {
@@ -100,8 +109,10 @@ export const NPCS: NpcDef[] = [
     title: 'the smith',
     role: 'folk',
     outfit: { skin: SKIN[2], hair: '#2b2118', top: '#5a5a60', trim: '#3a2a1c', legs: '#3a2a1c', hat: 'none', beard: true, apron: true },
-    home: { x: -11, z: 8 },
-    wander: 2,
+    home: { x: 0, z: 0 },
+    wander: 0.8,
+    inside: 'forge',
+    spot: 'hobb',
     greeting: ['Mind the anvil. It bites.', "If you've come about the noise, it's called work."],
   },
   {
@@ -110,8 +121,10 @@ export const NPCS: NpcDef[] = [
     title: 'who has seen things',
     role: 'folk',
     outfit: { skin: SKIN[4], hair: '#e8e8e8', top: '#6a4a7a', trim: '#b8903a', legs: '#3a2a1c', hat: 'hood', dress: true },
-    home: { x: 6, z: 12 },
-    wander: 3,
+    home: { x: 0, z: 0 },
+    wander: 1.2,
+    inside: 'nell',
+    spot: 'resident',
     greeting: ['I knew your grandmother. Or someone very like her. Probably.', 'Sit down, sit down. Not there.'],
   },
   {
@@ -133,6 +146,54 @@ export const NPCS: NpcDef[] = [
     home: { x: 7, z: -6 },
     wander: 5,
     greeting: ['Eggs? No? Suit yourself. They are very good eggs.', 'Morning. Or whatever it is. I lose track.'],
+  },
+  {
+    id: 'pell',
+    name: 'Pell Hardacre',
+    title: 'who is mostly at the Goose',
+    role: 'folk',
+    outfit: { skin: SKIN[0], hair: '#6b3a2a', top: '#5a6a3a', trim: '#a8582a', legs: '#3a2a1c', hat: 'none', beard: true },
+    home: { x: 0, z: 0 },
+    wander: 0.4,
+    inside: 'goose',
+    spot: 'patron',
+    greeting: ["You're new. I'm not. I've been here since lunch. Which lunch, I couldn't tell you.", 'Pull up a stool. Not that one, that one bites.'],
+  },
+  {
+    id: 'ottilie',
+    name: 'Ottilie Marsh',
+    title: 'clerk to the Reeve',
+    role: 'folk',
+    outfit: { skin: SKIN[2], hair: '#2b2118', top: '#5a3d6a', trim: '#e0b04a', legs: '#2b2b33', hat: 'none', dress: true },
+    home: { x: 0, z: 0 },
+    wander: 1.5,
+    inside: 'hall',
+    spot: 'resident',
+    greeting: ['Do you have an appointment? No? Nobody does. Go on, then.', "If it's about the ring, he knows. Believe me, he knows."],
+  },
+  {
+    id: 'ashby',
+    name: 'Widow Ashby',
+    title: 'who keeps a tidy house',
+    role: 'folk',
+    outfit: { skin: SKIN[4], hair: '#d8d8d8', top: '#2b2b33', trim: '#f4ecd6', legs: '#2b2b33', hat: 'kerchief', dress: true, apron: true },
+    home: { x: 0, z: 0 },
+    wander: 1.5,
+    inside: 'ashby',
+    spot: 'resident',
+    greeting: ['Boots! Mind your boots on my floor.', 'Visitors. How unexpected. I shall have to pretend to be pleased.'],
+  },
+  {
+    id: 'tam',
+    name: 'Tam',
+    title: "the miller's youngest",
+    role: 'folk',
+    outfit: { skin: SKIN[1], hair: '#b8582a', top: '#3f6a7a', trim: '#c9a24a', legs: '#5a4330', hat: 'none' },
+    home: { x: 0, z: 0 },
+    wander: 2,
+    inside: 'miller',
+    spot: 'resident',
+    greeting: ["Are you a robber? You look like a robber. A nice one.", "Bram says there's a ghost in the barrow. Bram says a lot of things."],
   },
 ]
 
