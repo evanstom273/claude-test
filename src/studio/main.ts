@@ -7,6 +7,18 @@ const scrim = document.getElementById('scrim')!
 const menu = document.getElementById('menu')!
 const title = document.getElementById('title')!
 const VIEWS = ['home', 'audio', 'visuals', 'writing', 'timeline']
+const main = document.querySelector('main')!
+
+/** The Art Studio is loaded the first time Visuals is opened. */
+let art: Promise<{ shown(): void }> | null = null
+function openArt() {
+  art ??= import('./art/artStudio').then(({ ArtStudio }) => {
+    const studio = new ArtStudio()
+    document.querySelector('section[data-view="visuals"]')!.appendChild(studio.root)
+    return studio
+  })
+  void art.then((a) => a.shown())
+}
 
 function setDrawer(open: boolean) {
   drawer.classList.toggle('open', open)
@@ -27,6 +39,8 @@ function showView() {
   const view = VIEWS.includes(name) ? name : 'home'
   for (const s of document.querySelectorAll<HTMLElement>('main section')) s.hidden = s.dataset.view !== view
   for (const a of drawer.querySelectorAll<HTMLAnchorElement>('a')) a.classList.toggle('active', a.dataset.view === view)
+  main.classList.toggle('full', view === 'visuals')
+  if (view === 'visuals') openArt()
   title.textContent = drawer.querySelector(`a[data-view="${view}"] span`)!.firstChild!.textContent!.trim()
 }
 

@@ -4,6 +4,16 @@
 
 The start of a cartoon studio in the browser, at https://evanstom273.github.io/claude-test/. So far it's the shell: a slide-out drawer with Home, Audio, Visuals, Writing and Timeline (`src/studio/`).
 
+### Art Studio (Visuals, phase 1)
+
+`src/studio/art/`: an SVG code editor with a live canvas preview.
+
+- **Code editor:** CodeMirror 6, with SVG autocomplete, tag closing and matching, folding, search and replace, formatting, and errors highlighted on their line.
+- **Canvas:** shows the last valid version while the code is broken. You can pan and zoom (pinch on touch), turn on a grid in artwork units, and use preview mode.
+- **Safety:** artwork is checked and sanitised before display. Scripts, event attributes and external resources are stripped, and the preview sits in a shadow root so its styles can't leak into the studio.
+- **Files:** New, Open, Save, Save As, Import and Export `.svg`. Artwork is saved in IndexedDB on this device, and the working copy is autosaved so unsaved work survives a closed tab.
+- **Layouts:** side by side, stacked, code only and canvas only, with a draggable divider.
+
 ## The Dorseys: "Smart Toast"
 
 An 85-second animated sitcom scene made entirely from SVG and JavaScript. Frank buys a smart toaster, and it does not go well. Play it at https://evanstom273.github.io/claude-test/player.html
