@@ -1,4 +1,4 @@
-.art { display: flex; flex-direction: column; height: calc(100dvh - 56px); position: relative; background: var(--bg); color: var(--text); }
+.art { display: flex; flex-direction: column; height: calc(100dvh - 56px); width: 100%; overflow: hidden; position: relative; background: var(--bg); color: var(--text); }
 .art .sp { flex: 1; }
 .art h3 { margin: 0; font-size: 14px; font-weight: 700; }
 .art button { font: inherit; color: inherit; }
@@ -26,8 +26,11 @@
 
 /* panels */
 .art-body { --src-h: 34%; --src-w: 440px; flex: 1; min-height: 0; display: grid; gap: 1px; background: var(--line); border-top: 1px solid var(--line);
-  grid-template-columns: 200px minmax(0, 1fr) 300px; grid-template-rows: minmax(0, 1fr) var(--src-h); grid-template-areas: "left canvas right" "src src src"; }
-.art-body[data-src="side"] { grid-template-columns: 200px minmax(0, 1fr) var(--src-w) 300px; grid-template-rows: minmax(0, 1fr); grid-template-areas: "left canvas src right"; }
+  grid-template-columns: minmax(150px, 200px) minmax(260px, 1fr) minmax(220px, 300px); grid-template-rows: minmax(0, 1fr) var(--src-h); grid-template-areas: "left canvas right" "src src src"; }
+/* source beside the canvas needs room for four columns; narrower screens keep it below */
+@media (min-width: 1100px) {
+  .art-body[data-src="side"] { grid-template-columns: minmax(150px, 200px) minmax(300px, 1fr) minmax(240px, var(--src-w)) minmax(220px, 300px); grid-template-rows: minmax(0, 1fr); grid-template-areas: "left canvas src right"; }
+  }
 .art-body[data-src="hidden"] { grid-template-rows: minmax(0, 1fr); grid-template-areas: "left canvas right"; }
 .art-body[data-src="hidden"] .p-source { display: none; }
 .art-body[data-max="true"] .p-source { display: flex; grid-area: 1 / 1 / -1 / -1; z-index: 5; }
@@ -118,7 +121,6 @@
 .p-source .code { flex: 1; min-height: 0; margin: 0 8px 8px; border-radius: 10px; overflow: hidden; background: #282c34; }
 .p-source .cm-editor { height: 100%; }
 .src-resize { position: absolute; left: 0; right: 0; top: -4px; height: 8px; cursor: row-resize; z-index: 2; }
-.art-body[data-src="side"] .src-resize { left: -4px; right: auto; top: 0; bottom: 0; width: 8px; height: auto; cursor: col-resize; }
 .src-resize:hover, .src-resize:focus-visible { background: var(--accent); outline: none; }
 .check { border: 0; background: none; font-size: 13px; cursor: pointer; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 4px 8px; }
 .check.ok { color: var(--dim); }

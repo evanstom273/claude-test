@@ -678,7 +678,7 @@ export class ArtStudio {
       handle.setPointerCapture(e.pointerId)
       const move = (ev: PointerEvent) => {
         const r = this.$.body.getBoundingClientRect()
-        if (this.place === 'side') this.$.body.style.setProperty('--src-w', `${Math.round(Math.max(240, Math.min(r.width - 420, r.right - ev.clientX - 280)))}px`)
+        if (this.place === 'side' && innerWidth >= 1100) this.$.body.style.setProperty('--src-w', `${Math.round(Math.max(240, Math.min(r.width - 420, r.right - ev.clientX - 280)))}px`)
         else this.$.body.style.setProperty('--src-h', `${Math.round(Math.max(120, Math.min(r.height - 160, r.bottom - ev.clientY)))}px`)
       }
       const done = () => {

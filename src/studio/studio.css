@@ -21,7 +21,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
 
 main { padding: 20px 16px; max-width: 1100px; margin: 0 auto; }
 /* full-bleed workspaces, like the Art Studio */
-main.full { padding: 0; max-width: none; }
+main.full { padding: 0; max-width: none; width: 100%; overflow: hidden; }
 section[hidden] { display: none; }
 h2 { margin: 0 0 6px; font-size: 24px; }
 section p { margin: 0; color: var(--dim); }
