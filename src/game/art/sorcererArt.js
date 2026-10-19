@@ -3,11 +3,11 @@
 
 const PX = 64 // rig units per metre
 const SCALE = 96 / 64 // final art: 96 world pixels per metre (1 SVG unit = 1 world pixel)
-const W = 96
-const H = 168
+const W = 150
+const H = 178
 const OUT_W = W * SCALE
 const OUT_H = H * SCALE
-const FOOT = { x: 48, y: 154 }
+const FOOT = { x: 75, y: 154 }
 const KY = 0.88 // vertical foreshortening of height
 const KZ = 0.42 // how far toward-camera depth pushes down the screen
 const LIGHT = norm([-0.55, 0.75, 0.45]) // from upper left, slightly toward camera
