@@ -1,6 +1,20 @@
 # claude-test
 
-`ART_STYLE.md` is the art direction for whatever comes next.
+## The Dorseys: "Smart Toast"
+
+An 85-second animated sitcom scene made entirely from SVG and JavaScript. Frank buys a smart toaster, and it does not go well. Play it at https://evanstom273.github.io/claude-test/
+
+- **Characters** (`src/characters/`): Frank and Linda share one rig. It has mouth shapes, blinking lids, brows, pupils, a head tilt, jointed arms with four hand shapes, walking legs and prop slots in the hands. Professor the cat has a small rig of his own.
+- **Direction** (`src/engine/director.ts`): a script of calls (`say`, `walk`, `pose`, `face`, `look`, `cam`, `sfx`, `place`, `fly`, `card`) compiles to keyframe tracks. Rendering is a pure function of time, so pause, restart and scrubbing are exact.
+- **Speech** (`src/engine/speech.ts`): each line is split into syllables. The same syllables drive the subtitle reveal, the mouth shapes and the gibberish voice.
+- **Sound** (`src/audio/`): Web Audio only, with no samples or text-to-speech.
+  - Each voice is an oscillator through vowel formant filters, and each character has their own pitch, speed and timbre.
+  - Every effect is synthesised.
+- **Episode** (`src/episode/smartToast.ts`): only the direction lives here. A new episode is a new script file that reuses the same cast, set and engine.
+
+`npm run dev` to work on it; adding `#t=42` to the URL opens paused at that moment.
+
+`ART_STYLE.md` is the art direction from the earlier game experiments.
 
 ## Archive
 
