@@ -20,13 +20,25 @@ async function loadSvg(svg: string) {
   }
 }
 
-const isBlank = (c: HTMLCanvasElement) => {
+const frame = () => new Promise((r) => requestAnimationFrame(() => r(null)))
+
+/** A cheap fingerprint of the drawn pixels, and whether anything was drawn at all. */
+function fingerprint(c: HTMLCanvasElement) {
   const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data
-  for (let i = 3; i < d.length; i += 16) if (d[i] !== 0) return false
-  return true
+  let h = 0
+  let any = false
+  for (let i = 0; i < d.length; i += 8) {
+    h = (Math.imul(h, 31) + d[i] + d[i + 3] * 7) | 0
+    if (d[i + 3] !== 0) any = true
+  }
+  return { h, any }
 }
 
-/** Draws an SVG string once into a canvas, so the game only ever blits bitmaps. */
+/**
+ * Draws an SVG string once into a canvas, so the game only ever blits bitmaps.
+ * WebKit can hand over an SVG before it has finished rasterising it, which draws
+ * part of the picture; so keep redrawing until two draws in a row match.
+ */
 export async function bake(svg: string, w: number, h: number, scale: number): Promise<HTMLCanvasElement> {
   const c = document.createElement('canvas')
   c.width = Math.ceil(w * scale)
@@ -35,16 +47,21 @@ export async function bake(svg: string, w: number, h: number, scale: number): Pr
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
       const img = await loadSvg(svg)
-      // give WebKit a frame to rasterise the SVG before drawing it
-      await new Promise((r) => requestAnimationFrame(() => r(null)))
-      ctx.clearRect(0, 0, c.width, c.height)
-      ctx.drawImage(img, 0, 0, c.width, c.height)
-      if (!isBlank(c)) {
-        bakeStats.done++
-        return c
+      await img.decode?.().catch(() => {})
+      let prev: number | null = null
+      for (let pass = 0; pass < 6; pass++) {
+        await frame()
+        ctx.clearRect(0, 0, c.width, c.height)
+        ctx.drawImage(img, 0, 0, c.width, c.height)
+        const fp = fingerprint(c)
+        if (fp.any && fp.h === prev) {
+          bakeStats.done++
+          return c
+        }
+        prev = fp.h
       }
     } catch {
-      // fall through and retry
+      // fall through and retry with a fresh image
     }
     await wait(60 * (attempt + 1))
   }
