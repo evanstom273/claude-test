@@ -1,5 +1,5 @@
-/** World units: 1 SVG unit = 1 world pixel, and 64 world pixels = 1 metre. */
-export const PX_PER_M = 64
+/** World units: 1 SVG unit = 1 world pixel, and 96 world pixels = 1 metre. */
+export const PX_PER_M = 96
 
 /** Metres to world pixels. */
 export const m = (metres: number) => metres * PX_PER_M
