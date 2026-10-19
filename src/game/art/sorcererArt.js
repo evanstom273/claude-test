@@ -37,6 +37,7 @@ const f = (n) => +n.toFixed(2)
 const IDLE = {
   bob: 0, // metres the upper body rises (feet stay planted)
   lean: 0, // forward lean, metres of forward shift per metre of height
+  sway: 0, // weight shifting side to side over the standing leg
   hem: { ox: 0, oz: 0, flare: 0 }, // robe hem offset and extra width
   mantle: { oz: 0 }, // capelet trailing behind
   hoodTip: 0, // hood point swinging back
@@ -58,7 +59,8 @@ function rig(a) {
   const w = (x, y, z) => {
     const yy = y + POSE.bob * k(y)
     const zz = z + POSE.lean * y
-    return [right[0] * x + fwd[0] * zz, yy, right[2] * x + fwd[2] * zz]
+    const xx = x + POSE.sway * k(y)
+    return [right[0] * xx + fwd[0] * zz, yy, right[2] * xx + fwd[2] * zz]
   }
   const p = ([X, Y, Z]) => ({ x: FOOT.x + X * PX, y: FOOT.y - Y * PX * KY + Z * PX * KZ, d: Z })
   const P = (x, y, z) => p(w(x, y, z))
@@ -88,7 +90,8 @@ function cone(R, ring0, ring1, ramp, opts = {}) {
       const z = Math.cos(t) * r.rz + (r.oz ?? 0)
       // a gentle wave at the hem for folds
       const fold = r.fold ? Math.sin(t * 7) * r.fold : 0
-      out.push({ t, P: R.P(x * (1 + fold), r.y, z * (1 + fold)), n: R.w(Math.sin(t), 0, Math.cos(t) * (r.rx / r.rz)) })
+      const dv = r.deform ? r.deform(t) : { dy: 0, dz: 0 }
+      out.push({ t, P: R.P(x * (1 + fold), r.y + dv.dy, z * (1 + fold) + dv.dz), n: R.w(Math.sin(t), 0, Math.cos(t) * (r.rx / r.rz)) })
     }
     return out
   }
@@ -117,15 +120,19 @@ function cone(R, ring0, ring1, ramp, opts = {}) {
   // hem band (trim) along the visible front of ring0
   let trim = ''
   if (opts.trim) {
-    const vis = a.filter((q, i) => i < N && q.P.d > -0.02)
+    const facesCam = (q) => q.n[2] > 0.05
+    const vis = a.filter((q, i) => i < N && facesCam(q))
     if (vis.length > 1) {
-      const lift = a.map((q) => R.P(Math.sin(q.t) * ring0.rx + (ring0.ox ?? 0), ring0.y + opts.trim.h, Math.cos(q.t) * ring0.rz + (ring0.oz ?? 0)))
-      const visIdx = a.map((q, i) => (q.P.d > -0.02 ? i : -1)).filter((i) => i >= 0 && i < N)
+      const lift = a.map((q) => {
+        const dv = ring0.deform ? ring0.deform(q.t) : { dy: 0, dz: 0 }
+        return R.P(Math.sin(q.t) * ring0.rx + (ring0.ox ?? 0), ring0.y + opts.trim.h + dv.dy, Math.cos(q.t) * ring0.rz + (ring0.oz ?? 0) + dv.dz)
+      })
+      const visIdx = a.map((q, i) => (facesCam(q) && facesCam(a[i + 1] ?? q) ? i : -1)).filter((i) => i >= 0 && i < N)
       for (const i of visIdx) {
         const n = norm(a[i].n)
         const c = tone(n, C.trim)
         trim += `<polygon points="${pts([a[i].P, a[i + 1].P, lift[i + 1], lift[i]])}" fill="${c}" stroke="${c}" stroke-width="0.5"/>`
-        if (opts.trim.motif && i % 2 === 0 && a[i].P.d > 0.02) {
+        if (opts.trim.motif && i % 2 === 0 && a[i].n[2] > 0.3) {
           const mx = (a[i].P.x + a[i + 1].P.x + lift[i].x + lift[i + 1].x) / 4
           const my = (a[i].P.y + a[i + 1].P.y + lift[i].y + lift[i + 1].y) / 4
           trim += `<path d="M${f(mx)} ${f(my - 1.6)} l1.3 1.6 l-1.3 1.6 l-1.3 -1.6Z" fill="${C.trim[0]}"/>`
@@ -201,22 +208,41 @@ function sorcerer(a, idp) {
   // contact shadow
   const shadow = `<ellipse cx="${FOOT.x}" cy="${FOOT.y}" rx="22" ry="8" fill="url(#${idp}sh)"/>`
 
-  // boots peeking out under the hem as the legs move
+  // boots: drawn behind the robe, so they show where they step out past the hem or the hem lifts
   for (const [i, sx] of [[0, -0.09], [1, 0.09]]) {
     const ft = POSE.feet[i]
-    const toe = R.w(sx, 0.02 + ft.lift, 0.16 + ft.z)
-    const heel = R.w(sx, 0.02 + ft.lift, 0.02 + ft.z)
-    const showFront = facingCam > -0.4 && toe[2] > R.w(0, 0, 0.18)[2] - 0.02
-    const showBack = facingCam < 0.4 && ft.z < -0.12
-    if (!showFront && !showBack) continue
-    const t = R.p(toe)
-    const h = R.p(heel)
-    const d = showFront ? -0.5 : -0.6
-    parts.push({ d, s: `<path d="M${f(h.x - 3.4)} ${f(h.y)} Q${f(t.x)} ${f(t.y + 2.8)} ${f(h.x + 3.4)} ${f(h.y)} Z" fill="${C.boot[1]}" stroke="${C.ink}" stroke-width="0.9"/>` })
+    const y0 = 0.01 + ft.lift
+    const q = (x, y, z) => R.w(sx + x, y0 + y, ft.z + z)
+    const pts3 = [q(-0.05, 0, -0.07), q(0.05, 0, -0.07), q(-0.045, 0, 0.19), q(0.045, 0, 0.19), q(0, 0.05, 0.2), q(-0.05, 0.12, -0.03), q(0.05, 0.12, -0.03), q(-0.05, 0.12, 0.06), q(0.05, 0.12, 0.06)]
+    const hull = convexHull(pts3.map((v) => R.p(v)))
+    const sole = [q(-0.05, 0, -0.07), q(0.05, 0, -0.07), q(-0.045, 0, 0.19), q(0.045, 0, 0.19), q(0, 0.015, 0.2)].map((v) => R.p(v))
+    const soleHull = convexHull(sole)
+    const toe = R.p(q(0, 0.06, 0.15))
+    parts.push({
+      d: -0.5,
+      s: `<path d="${smooth(hull)}" fill="${C.boot[1]}" stroke="${C.ink}" stroke-width="0.9"/><path d="${smooth(soleHull)}" fill="${C.boot[0]}"/><ellipse cx="${f(toe.x - 0.8)}" cy="${f(toe.y - 0.8)}" rx="1.8" ry="1" fill="#4a3c30"/>`,
+    })
   }
 
   // robe: hem to waist, then waist to shoulders
-  const hem = { y: 0.04, rx: 0.3 + POSE.hem.flare, rz: 0.24 + POSE.hem.flare, ox: POSE.hem.ox, oz: -0.02 + POSE.hem.oz, fold: 0.035 + POSE.hem.flare * 0.3 }
+  const legZ = (t) => {
+    // each leg drives its own half of the hem, with a short blend down the middle
+    const wR = Math.max(0, Math.min(1, 0.5 + Math.sin(t) * 2.5))
+    return POSE.feet[0].z * (1 - wR) + POSE.feet[1].z * wR
+  }
+  const hem = {
+    y: 0.04,
+    rx: 0.3 + POSE.hem.flare,
+    rz: 0.24 + POSE.hem.flare,
+    ox: POSE.hem.ox,
+    oz: -0.02 + POSE.hem.oz,
+    fold: 0.035 + POSE.hem.flare * 0.3,
+    deform: (t) => {
+      const lz = legZ(t)
+      const front = Math.max(0, Math.cos(t))
+      return { dz: lz * (lz > 0 ? 0.45 : 0.3), dy: Math.max(0, lz) * 0.6 * front }
+    },
+  }
   const waist = { y: 0.98, rx: 0.17, rz: 0.12 }
   const chest = { y: 1.36, rx: 0.2, rz: 0.13 }
   const skirt = cone(R, hem, waist, C.robe, { trim: { h: 0.07, motif: true } })
@@ -433,14 +459,15 @@ export const CYCLES = {
     const c = Math.cos(ph * Math.PI * 2)
     return {
       ...IDLE,
-      bob: 0.022 * (1 - Math.abs(s)) - 0.011,
-      lean: 0.035,
-      hem: { ox: -0.02 * s, oz: 0.02, flare: 0.01 },
-      mantle: { oz: -0.01 },
-      hoodTip: 0.01,
-      feet: [{ z: -0.12 * s, lift: 0.03 * Math.max(0, -c) }, { z: 0.12 * s, lift: 0.03 * Math.max(0, c) }],
-      leftHand: { z: 0.12 * s, y: 0 },
-      grip: { z: -0.07 * s, y: 0.01 * Math.abs(s) },
+      bob: 0.035 * (1 - Math.abs(s)) - 0.015,
+      lean: 0.04,
+      sway: 0.022 * c,
+      hem: { ox: 0, oz: 0.01, flare: 0.01 },
+      mantle: { oz: -0.015 },
+      hoodTip: 0.015,
+      feet: [{ z: -0.22 * s, lift: 0.05 * Math.max(0, -c) }, { z: 0.22 * s, lift: 0.05 * Math.max(0, c) }],
+      leftHand: { z: 0.13 * s, y: 0 },
+      grip: { z: -0.07 * s, y: 0.012 * Math.abs(s) },
       staffTilt: -0.08 * s,
       staffLift: 0.06,
     }
@@ -450,12 +477,13 @@ export const CYCLES = {
     const c = Math.cos(ph * Math.PI * 2)
     return {
       ...IDLE,
-      bob: 0.04 * (1 - Math.abs(s)) - 0.015,
+      bob: 0.05 * (1 - Math.abs(s)) - 0.02,
       lean: 0.13,
-      hem: { ox: -0.03 * s, oz: -0.07, flare: 0.04 },
+      sway: 0.015 * c,
+      hem: { ox: 0, oz: -0.06, flare: 0.04 },
       mantle: { oz: -0.07 },
       hoodTip: 0.08,
-      feet: [{ z: -0.2 * s, lift: 0.05 * Math.max(0, -c) }, { z: 0.2 * s, lift: 0.05 * Math.max(0, c) }],
+      feet: [{ z: -0.32 * s, lift: 0.09 * Math.max(0, -c) }, { z: 0.32 * s, lift: 0.09 * Math.max(0, c) }],
       leftHand: { z: 0.2 * s, y: 0.08 + 0.04 * Math.abs(s) },
       // staff carried low and slanted forward, rocking with the stride
       grip: { z: 0.06 - 0.06 * s, y: -0.05 },
