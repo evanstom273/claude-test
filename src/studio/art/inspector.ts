@@ -68,7 +68,11 @@ export class Inspector {
     this.el.classList.toggle('empty', !src)
     if (!src) {
       this.title.textContent = 'Nothing selected'
-      for (const i of Object.values(this.f)) i.disabled = true
+      for (const i of Object.values(this.f)) {
+        i.disabled = true
+        if (i.type !== 'color') i.value = ''
+      }
+      this.f.fill.placeholder = this.f.stroke.placeholder = ''
       return
     }
     const id = attr(src, 'id')?.value

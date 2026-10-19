@@ -40,6 +40,8 @@
 .p-tools, .p-layers, .p-inspector, .p-ai { padding: 12px; }
 .p-layers { flex: 1; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
 .p-inspector h3, .p-tools h3 { margin-bottom: 10px; }
+/* the right column scrolls as a whole; panels in it keep their natural height */
+.col-right > .p-inspector { flex: none; }
 .p-ai { flex: 1; display: flex; flex-direction: column; }
 .tabs { display: none; }
 
