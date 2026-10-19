@@ -9,13 +9,22 @@ The start of a cartoon studio in the browser, at https://evanstom273.github.io/c
 `src/studio/art/`: SVG source and canvas kept in step.
 
 - **Layout:** header, tools, layers, canvas, inspector, AI assistant and SVG source. On phones, the canvas sits above a tab bar.
-- **Canvas:** tap selects a top-level object, a quick second tap picks inside groups, and drag moves. Pan and zoom by drag, wheel or pinch.
-- **Layers and inspector:** the layers panel shows every element as a tree. The inspector edits ID, X, Y, width, height, rotation, fill and stroke.
-- **Source sync:** every change from the canvas, layers or inspector writes only the affected characters of the source (`sourceMap.ts`), so it's one undo step and the rest of the code is untouched. Moving the code cursor selects the element on the canvas.
+- **Tools** (`tools.ts`):
+  - **Select:** tap, Shift to add, double-tap to go into groups, box-select, move with snapping, and handles to resize (Shift keeps proportions, Alt from the centre) and rotate (Shift snaps to 15°).
+  - **Node editing:** drag nodes and handles, add, delete, smooth or corner, close or open, split, join.
+  - **Drawing:** rectangle, ellipse or circle, line, polygon, star, text, pen and pencil (smoothed with Paper.js).
+  - **Also:** eyedropper and hand. Tap with a shape tool to drop a 100-unit shape.
+- **Object operations** (`ops.ts`): group and ungroup (the group's transform and style pass to the children), duplicate with fresh ids, delete, and stacking order. Align and distribute, flip, convert to path, combine. Boolean union, subtract, intersect and exclude, plus simplify (Paper.js). Every operation is written as text edits to the source, one undo step each.
+- **Inspector:**
+  - X, Y, width and height with proportion lock; rotation; skew; a 3×3 transform origin; flip.
+  - Fill, stroke, stroke width, opacity and blend mode, for one or many objects.
+  - Text content and font, rectangle corner radius, and path node actions.
+- **Layers:** a tree with hide (`display="none"`), lock (`data-locked`), rename, drag to reorder or into groups, and new layers (top-level groups).
+- **Navigation and snapping:** pan (hand tool, Space-drag, two fingers, wheel), zoom, fit artwork or selection, rulers, guides dragged out of the rulers, a grid, and snapping to the grid, guides and other objects with pink alignment lines.
 - **Code editor:** CodeMirror 6, with SVG autocomplete, validation, formatting and lint markers. If the code is broken, the canvas keeps the last valid version.
 - **Safety:** previews are sanitised (no scripts, event attributes or external resources) and rendered in a shadow root.
-- **AI assistant:** Gemini (3.1 Flash-Lite or 3.8 Flash, chosen separately for editing and creating, each with a thinking level), with your own key stored on this device. "Create…" requests or a blank canvas get a creation prompt; everything else edits the selection or the whole artwork. The prompt teaches construction tricks (`<use>` + rotate, dash-array rings) instead of hand-calculated coordinates, and a broken or cut-off reply is sent back once to be fixed. Results are previewed on the canvas to accept or reject, and accepted changes go into undo history. It also shows token usage, optional cost estimates from prices you enter, and lets you cancel a request.
-- **Storage:** Dexie (IndexedDB) holds artworks, the autosaved working copy, AI settings and usage history.
+- **AI assistant (paused):** Gemini, with your own key stored on this device. It creates or edits artwork with a self-review step and shows the result to accept or reject.
+- **Storage:** Dexie (IndexedDB) holds artworks, the autosaved working copy and editor-only metadata such as guides, stored beside the SVG and never inside it.
 
 ## The Dorseys: "Smart Toast"
 

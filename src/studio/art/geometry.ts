@@ -92,7 +92,7 @@ export function transformString(m: DOMMatrix) {
 }
 
 /** Express a change made in root space as a change in the element's parent space. */
-function inParent(el: SVGGraphicsElement, root: SVGSVGElement, rootChange: DOMMatrix) {
+export function inParent(el: SVGGraphicsElement, root: SVGSVGElement, rootChange: DOMMatrix) {
   const p = parentToRoot(el, root)
   return p.inverse().multiply(rootChange).multiply(p)
 }
@@ -123,4 +123,33 @@ export function rotated(el: SVGGraphicsElement, root: SVGSVGElement, delta: numb
 /** The element's rotation as it appears in the artwork, in degrees. */
 export function rootRotation(el: SVGGraphicsElement, root: SVGSVGElement) {
   return decompose(toRoot(el, root)).rotate
+}
+
+/** The element's new own transform after a change made in root space. */
+export function applyRoot(el: SVGGraphicsElement, root: SVGSVGElement, change: DOMMatrix, base = ownMatrix(el)) {
+  return inParent(el, root, change).multiply(base)
+}
+
+/** Bounds of several elements together, in root units. */
+export function unionBox(els: SVGGraphicsElement[], root: SVGSVGElement): Box | null {
+  let b: Box | null = null
+  for (const el of els) {
+    const r = rootBox(el, root)
+    if (!r) continue
+    if (!b) b = { ...r }
+    else {
+      const x2 = Math.max(b.x + b.width, r.x + r.width)
+      const y2 = Math.max(b.y + b.height, r.y + r.height)
+      b.x = Math.min(b.x, r.x)
+      b.y = Math.min(b.y, r.y)
+      b.width = x2 - b.x
+      b.height = y2 - b.y
+    }
+  }
+  return b
+}
+
+/** A point of a box picked by a 3×3 origin grid (0..2 across, 0..2 down). */
+export function boxPoint(b: Box, ox: number, oy: number) {
+  return { x: b.x + (b.width * ox) / 2, y: b.y + (b.height * oy) / 2 }
 }
