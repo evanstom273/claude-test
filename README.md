@@ -1,8 +1,12 @@
 # claude-test
 
+## Studio
+
+The start of a cartoon studio in the browser, at https://evanstom273.github.io/claude-test/. So far it's the shell: a slide-out drawer with Home, Audio, Visuals, Writing and Timeline (`src/studio/`).
+
 ## The Dorseys: "Smart Toast"
 
-An 85-second animated sitcom scene made entirely from SVG and JavaScript. Frank buys a smart toaster, and it does not go well. Play it at https://evanstom273.github.io/claude-test/
+An 85-second animated sitcom scene made entirely from SVG and JavaScript. Frank buys a smart toaster, and it does not go well. Play it at https://evanstom273.github.io/claude-test/player.html
 
 - **Characters** (`src/characters/`): Frank and Linda share one rig. It has mouth shapes, blinking lids, brows, pupils, a head tilt, jointed arms with four hand shapes, walking legs and prop slots in the hands. Professor the cat has a small rig of his own.
 - **Direction** (`src/engine/director.ts`): a script of calls (`say`, `walk`, `pose`, `face`, `look`, `cam`, `sfx`, `place`, `fly`, `card`) compiles to keyframe tracks. Rendering is a pure function of time, so pause, restart and scrubbing are exact.
