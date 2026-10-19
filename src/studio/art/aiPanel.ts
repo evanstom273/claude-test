@@ -88,13 +88,13 @@ export class AiPanel {
         <span class="ptext"></span>
         <span class="pbtns"><button type="button" class="reject">Reject</button><button type="button" class="accept primary">Accept</button></span>
       </div>
-      <div class="ai-status" hidden role="status"><span class="spin" aria-hidden="true"></span><span class="stext"></span><span class="stime"></span><button type="button" class="scancel">Cancel</button></div>
+      <div class="ai-status" hidden role="status"><span class="spin" aria-hidden="true"></span><span class="stext"><span class="sline"></span><span class="sthought"></span></span><span class="stime"></span><button type="button" class="scancel">Cancel</button></div>
       <form class="ai-form">
         <textarea rows="2" placeholder="Describe an SVG edit…" aria-label="Instruction for the AI"></textarea>
         <button type="submit" class="send" aria-label="Send" title="Send">↑</button>
       </form>
       <div class="ai-chips"><button type="button" class="chip target"></button><span class="chip usage" hidden></span></div>`
-    for (const k of ['model', 'log', 'proposal', 'ptext', 'accept', 'reject', 'target', 'usage', 'send', 'status', 'stext', 'stime']) this.$[k] = this.el.querySelector(`.${k}, .ai-${k}`)!
+    for (const k of ['model', 'log', 'proposal', 'ptext', 'accept', 'reject', 'target', 'usage', 'send', 'status', 'stext', 'sline', 'sthought', 'stime']) this.$[k] = this.el.querySelector(`.${k}, .ai-${k}`)!
     this.$.textarea = this.el.querySelector('textarea')!
     this.$.model.addEventListener('click', () => void this.openSettings())
     this.el.querySelector('.scancel')!.addEventListener('click', () => this.abort?.abort())
@@ -200,8 +200,10 @@ export class AiPanel {
     const started = performance.now()
     let phase = ''
     let chars = 0
+    let thought: string | null = null
     const showStatus = () => {
-      this.$.stext.textContent = chars ? `${phase}: writing the SVG (${chars.toLocaleString()} characters so far)` : `${phase}: ${thinkingLevel === 'high' ? 'thinking' : 'waiting for the reply'}…`
+      this.$.sline.textContent = chars ? `${phase}: writing the SVG (${chars.toLocaleString()} characters so far)` : `${phase}: ${thought || thinkingLevel === 'high' ? 'thinking' : 'waiting for the reply'}…`
+      this.$.sthought.textContent = thought && !chars ? thought : ''
       this.$.stime.textContent = `${Math.floor((performance.now() - started) / 1000)}s`
     }
     const status = { remove: () => (this.$.status.hidden = true) }
@@ -222,10 +224,12 @@ export class AiPanel {
       for (let attempt = 0; attempt < 2; attempt++) {
         phase = attempt ? `${FAMILIES[family].short} is fixing its reply` : `${creating ? 'Creating' : 'Editing'} with ${FAMILIES[family].short}`
         chars = 0
+        thought = null
         showStatus()
-        const r = await generate(this.settings, family, thinkingLevel, SYSTEM, turns, this.abort.signal, (n) => {
-          if (n !== chars) {
+        const r = await generate(this.settings, family, thinkingLevel, SYSTEM, turns, this.abort.signal, (n, t) => {
+          if (n !== chars || t !== thought) {
             chars = n
+            thought = t
             showStatus()
           }
         })
