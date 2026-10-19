@@ -1,0 +1,29 @@
+* { box-sizing: border-box; }
+:root { --bg: #16161a; --panel: #1f1f25; --line: #2e2e36; --text: #ececf1; --dim: #9a9aa6; --accent: #ffd23a; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+
+#bar { position: sticky; top: 0; z-index: 10; height: 56px; display: flex; align-items: center; gap: 8px; padding: 0 8px; padding-top: env(safe-area-inset-top); background: var(--panel); border-bottom: 1px solid var(--line); }
+#menu { width: 44px; height: 44px; display: grid; place-items: center; border: 0; border-radius: 10px; background: none; color: var(--text); cursor: pointer; }
+#menu:hover, #menu:focus-visible { background: #2a2a32; }
+#title { margin: 0; font-size: 18px; font-weight: 700; }
+
+#scrim { position: fixed; inset: 0; z-index: 20; background: #0008; opacity: 0; transition: opacity 0.2s; }
+#scrim.open { opacity: 1; }
+#drawer { position: fixed; top: 0; bottom: 0; left: 0; z-index: 30; width: min(280px, 82vw); padding: env(safe-area-inset-top) 8px 16px; background: var(--panel); border-right: 1px solid var(--line); transform: translateX(-100%); transition: transform 0.22s ease; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+#drawer.open { transform: none; }
+.drawer-head { padding: 18px 12px 14px; font-size: 20px; font-weight: 800; color: var(--accent); }
+#drawer a { display: flex; align-items: center; gap: 14px; min-height: 48px; padding: 8px 12px; border-radius: 10px; color: var(--text); text-decoration: none; }
+#drawer a:hover, #drawer a:focus-visible { background: #2a2a32; }
+#drawer a.active { background: #33302a; color: var(--accent); }
+#drawer svg { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+#drawer span { display: flex; flex-direction: column; font-size: 15px; font-weight: 600; }
+#drawer small { font-size: 12px; font-weight: 400; color: var(--dim); }
+
+main { padding: 20px 16px; max-width: 1100px; margin: 0 auto; }
+section[hidden] { display: none; }
+h2 { margin: 0 0 6px; font-size: 24px; }
+section p { margin: 0; color: var(--dim); }
+.card { display: flex; flex-direction: column; gap: 4px; margin-top: 16px; max-width: 360px; padding: 16px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); color: var(--text); text-decoration: none; }
+.card:hover, .card:focus-visible { border-color: var(--accent); }
+.card-title { font-weight: 700; }
+.card-sub { font-size: 13px; color: var(--dim); }
