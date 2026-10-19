@@ -61,11 +61,14 @@ export interface GeminiResult {
   note?: string
 }
 
-export async function generate(settings: AiSettings, family: ModelFamily, thinking: Thinking, system: string, turns: Turn[], signal: AbortSignal): Promise<GeminiResult> {
+/** Progress while a reply streams in: how many characters of the answer have arrived so far. */
+export type Progress = (chars: number) => void
+
+export async function generate(settings: AiSettings, family: ModelFamily, thinking: Thinking, system: string, turns: Turn[], signal: AbortSignal, onProgress: Progress = () => {}): Promise<GeminiResult> {
   if (!resolved[family]) await resolveModels(settings.apiKey).catch(() => {})
   const model = modelId(family)
   const call = (withThinking: boolean) =>
-    fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
+    fetch(`${API}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
       method: 'POST',
       signal,
       headers: { 'content-type': 'application/json', 'x-goog-api-key': settings.apiKey },
@@ -87,22 +90,49 @@ export async function generate(settings: AiSettings, family: ModelFamily, thinki
     } else throw new Error(msg)
   }
   if (!res.ok) throw new Error(await errorText(res))
-  const data = (await res.json()) as {
+  // the reply streams in as server-sent events, so progress can be shown while it's written
+  type Chunk = {
     candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] }; finishReason?: string }[]
     usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number }
     promptFeedback?: { blockReason?: string }
+    error?: { message?: string }
   }
-  if (data.promptFeedback?.blockReason) throw new Error(`Gemini blocked the request (${data.promptFeedback.blockReason})`)
-  const cand = data.candidates?.[0]
-  const text = cand?.content?.parts?.filter((p) => !p.thought).map((p) => p.text ?? '').join('') ?? ''
+  let text = ''
+  let finish = ''
+  let usage: Chunk['usageMetadata'] = {}
+  const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader()
+  let buf = ''
+  const handle = (line: string) => {
+    if (!line.startsWith('data:')) return
+    const c = JSON.parse(line.slice(5)) as Chunk
+    if (c.error) throw new Error(c.error.message ?? 'Gemini reported an error')
+    if (c.promptFeedback?.blockReason) throw new Error(`Gemini blocked the request (${c.promptFeedback.blockReason})`)
+    const cand = c.candidates?.[0]
+    for (const part of cand?.content?.parts ?? []) if (!part.thought && part.text) text += part.text
+    if (cand?.finishReason) finish = cand.finishReason
+    if (c.usageMetadata) usage = c.usageMetadata
+    onProgress(text.length)
+  }
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) break
+    buf += value
+    let nl: number
+    while ((nl = buf.indexOf('\n')) >= 0) {
+      handle(buf.slice(0, nl).trim())
+      buf = buf.slice(nl + 1)
+    }
+  }
+  if (buf.trim()) handle(buf.trim())
+  const data = { usageMetadata: usage }
   const input = data.usageMetadata?.promptTokenCount ?? 0
   // thinking tokens are billed as output
   const output = (data.usageMetadata?.candidatesTokenCount ?? 0) + (data.usageMetadata?.thoughtsTokenCount ?? 0)
   const p = settings.prices[family]
   const cost = p.in !== null && p.out !== null ? (input * p.in + output * p.out) / 1e6 : null
   await addUsage({ time: Date.now(), model, input, output, cost })
-  if (!text.trim()) throw new Error(`Gemini returned nothing${cand?.finishReason ? ` (${cand.finishReason})` : ''}`)
-  return { text, finish: cand?.finishReason ?? 'STOP', input, output, cost, model, note }
+  if (!text.trim()) throw new Error(`Gemini returned nothing${finish ? ` (${finish})` : ''}`)
+  return { text, finish: finish || 'STOP', input, output, cost, model, note }
 }
 
 /** Settings dialog: key, models, thinking, optional prices, and usage so far. Resolves with the saved settings. */
