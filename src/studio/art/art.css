@@ -162,6 +162,8 @@
 .art-dialog label { display: grid; gap: 4px; font-size: 13px; color: var(--dim); }
 .art-dialog input, .art-dialog select { width: 100%; min-width: 0; height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: #0d0d10; color: var(--text); font: 14px system-ui, sans-serif; box-sizing: border-box; }
 .art-dialog .row-in { display: flex; gap: 8px; }
+.art-dialog .check-row { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text); }
+.art-dialog .check-row input { width: 20px; height: 20px; flex: none; }
 .art-dialog .row-in > * { flex: 1; }
 .art-dialog .row-in .plabel { flex: 0 0 96px; align-self: end; padding-bottom: 10px; font-size: 13px; color: var(--text); }
 .art-dialog .row-in .load { flex: none; padding: 0 12px; border: 0; border-radius: 8px; background: #2a2a32; color: var(--text); cursor: pointer; }

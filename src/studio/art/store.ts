@@ -31,6 +31,8 @@ export interface AiSettings {
   createModel: ModelFamily
   thinkingEdit: Thinking
   thinkingCreate: Thinking
+  /** Show new artwork back to the model as an image so it can spot and fix its own mistakes. */
+  selfReview: boolean
   /** Optional, for cost estimates: US dollars per million tokens, per model. */
   prices: Record<ModelFamily, { in: number | null; out: number | null }>
 }
@@ -83,6 +85,7 @@ export const DEFAULT_AI: AiSettings = {
   createModel: 'lite',
   thinkingEdit: 'default',
   thinkingCreate: 'high',
+  selfReview: true,
   prices: { lite: { in: null, out: null }, flash: { in: null, out: null } },
 }
 export const getAiSettings = async (): Promise<AiSettings> => {

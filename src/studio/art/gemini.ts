@@ -47,6 +47,8 @@ async function errorText(res: Response) {
 export interface Turn {
   role: 'user' | 'model'
   text: string
+  /** A PNG, base64-encoded, sent alongside the text. */
+  image?: string
 }
 
 export interface GeminiResult {
@@ -74,7 +76,7 @@ export async function generate(settings: AiSettings, family: ModelFamily, thinki
       headers: { 'content-type': 'application/json', 'x-goog-api-key': settings.apiKey },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
-        contents: turns.map((t) => ({ role: t.role, parts: [{ text: t.text }] })),
+        contents: turns.map((t) => ({ role: t.role, parts: [{ text: t.text }, ...(t.image ? [{ inlineData: { mimeType: 'image/png', data: t.image } }] : [])] })),
         // includeThoughts streams short summaries of the model's thinking, shown in the status bar
         ...(withThinking ? { generationConfig: { thinkingConfig: { includeThoughts: true, ...(thinking !== 'default' ? { thinkingLevel: thinking } : {}) } } } : {}),
       }),
@@ -165,6 +167,8 @@ export async function settingsDialog(): Promise<AiSettings | null> {
     <div class="row-in"><label>Model for edits${models('editModel')}</label><label>Thinking${think('thinkingEdit')}</label></div>
     <div class="row-in"><label>Model for creating${models('createModel')}</label><label>Thinking${think('thinkingCreate')}</label></div>
     <p class="hint">More thinking usually means better geometry and more complete artwork, but slower and with more output tokens.</p>
+    <label class="check-row"><input name="selfReview" type="checkbox"> Self-review new artwork</label>
+    <p class="hint">Shows the model a picture of what it drew and asks it to fix problems like detached or overlapping parts. One extra request each time.</p>
     <fieldset><legend>Prices for cost estimates (optional, $ per 1M tokens)</legend>${price('lite')}${price('flash')}</fieldset>
     <p class="hint usage"></p>
     <div class="actions"><button type="button" class="clear-usage">Clear usage history</button><span></span><button value="cancel">Cancel</button><button value="save" class="primary">Save</button></div>
@@ -176,6 +180,7 @@ export async function settingsDialog(): Promise<AiSettings | null> {
   el<HTMLSelectElement>('createModel').value = s.createModel
   el<HTMLSelectElement>('thinkingEdit').value = s.thinkingEdit
   el<HTMLSelectElement>('thinkingCreate').value = s.thinkingCreate
+  el<HTMLInputElement>('selfReview').checked = s.selfReview
   for (const fam of Object.keys(FAMILIES) as ModelFamily[]) {
     el<HTMLInputElement>(`${fam}In`).value = s.prices[fam].in?.toString() ?? ''
     el<HTMLInputElement>(`${fam}Out`).value = s.prices[fam].out?.toString() ?? ''
@@ -217,6 +222,7 @@ export async function settingsDialog(): Promise<AiSettings | null> {
         createModel: el<HTMLSelectElement>('createModel').value as ModelFamily,
         thinkingEdit: el<HTMLSelectElement>('thinkingEdit').value as Thinking,
         thinkingCreate: el<HTMLSelectElement>('thinkingCreate').value as Thinking,
+        selfReview: el<HTMLInputElement>('selfReview').checked,
         prices: { lite: { in: num('liteIn'), out: num('liteOut') }, flash: { in: num('flashIn'), out: num('flashOut') } },
       }
       await putAiSettings(next)

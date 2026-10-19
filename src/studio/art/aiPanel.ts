@@ -1,5 +1,6 @@
 import { FAMILIES, generate, settingsDialog, type GeminiResult, type Turn } from './gemini'
 import { getAiSettings, type AiSettings } from './store'
+import { artSize, parseSvg } from './validate'
 
 /**
  * The AI Art Assistant: sends the selected element (or the whole artwork)
@@ -23,8 +24,8 @@ export interface AiHost {
   blank(): boolean
   /** The selected element, if any and if the code is valid. */
   selection(): AiTarget | null
-  /** Show a proposal on the canvas; returns an error message if it doesn't work. */
-  propose(target: AiTarget, replacement: string): string | null
+  /** Check a proposal and (unless show is false) preview it on the canvas; returns an error message if it doesn't work. */
+  propose(target: AiTarget, replacement: string, show?: boolean): string | null
   accept(): void
   reject(): void
 }
@@ -41,17 +42,61 @@ Building accurately. You can't measure, so don't hand-calculate dozens of coordi
 - Text round a circle: one <text> per label with text-anchor="middle" and dominant-baseline="central", positioned at the top and turned into place with transform="rotate(angle cx cy)".
 - Prefer basic shapes (circle, ellipse, rect, line, polygon) with transforms over long hand-made paths. When you do write paths, keep them simple and smooth.
 - Finish everything. Every repeated part must actually be in the reply. Never leave placeholders, "...", or comments like "repeat for the rest".
+- Parts that belong together must actually join: feet on the ends of legs, hands on arms, heads on necks, objects resting on surfaces. Overlap them slightly rather than leaving gaps.
+- Keep one consistent viewpoint for the whole picture. A face and the body it belongs to are drawn from the same angle.
 - If the subject is a real thing with a known design (a dartboard, a flag, a clock face, a playing card), reproduce its real layout accurately: the right counts, order, proportions and colours.`
+
+/** What "2.5D" means in this studio, from the Art Studio spec. */
+const STYLE_25D = `"2.5D" in this studio means fundamentally 2D cartoon artwork with convincing depth and volume: layered shading, controlled gradients, highlights, contact shadows and ambient shadows, visible sides on objects, and clear foreground, middle ground and background. Characters face front, three-quarter, side or back, with the head and body drawn consistently from that one angle. It does NOT mean isometric, blocky, voxel or low-poly art; only use those if the user asks for them by name.`
 
 const CREATE_RULE = `You are CREATING new artwork from a description.
 - Keep the current document's width, height and viewBox, and fill that canvas sensibly, centred.
 - Make it complete and polished in whatever style the user asks for. If they don't name a style, use the studio's cartoon style: clean dark outlines (#1a1410), solid colours with simple layered shading and highlights, bold readable shapes.
+- ${STYLE_25D}
 - Organise it into groups with descriptive ids (for example id="board", id="numbers") so parts can be selected and edited later.
 - Return one complete SVG document: a single <svg> root with xmlns="http://www.w3.org/2000/svg".`
 
-const EDIT_RULE = `You are EDITING existing artwork. Change only what the instruction asks for. Keep existing ids, group structure and unrelated elements exactly as they are.`
+const EDIT_RULE = `You are EDITING existing artwork. Change only what the instruction asks for. Keep existing ids, group structure and unrelated elements exactly as they are.
+${STYLE_25D}`
 const ELEMENT_RULE = `Return a replacement for exactly the TARGET element and nothing else: a single element. If the change needs new gradients or filters, you may return a <g> that holds a <defs> and the edited element, keeping the element's own id on it.`
 const WHOLE_RULE = `Return one complete SVG document: a single <svg> root with xmlns="http://www.w3.org/2000/svg".`
+
+const REVIEW = `The attached image is exactly how your SVG renders. Look at it carefully against the description and fix every problem you can see, for example:
+- parts that should join but don't (feet floating off legs, hands off arms, a head off its neck, objects hovering above surfaces), or parts that overlap or poke through each other wrongly;
+- a mixed or inconsistent viewpoint (a front-on face on a side-on body, mismatched perspective);
+- wrong proportions, missing or duplicated parts, anything clipped by the edge of the canvas;
+- anything that doesn't match what was asked for, including the style.
+Keep everything that already works. If nothing needs fixing, reply with the same SVG. Reply with the complete corrected SVG document only.`
+
+/** Render SVG source to a PNG (base64, no prefix), long side at most 1024px, on white. */
+async function renderPng(source: string): Promise<string> {
+  const r = parseSvg(source)
+  if (!r.ok) throw new Error(r.errors[0].message)
+  const svg = r.svg
+  const size = artSize(svg)
+  const k = Math.min(1, 1024 / Math.max(size.width, size.height))
+  if (!svg.getAttribute('viewBox')) svg.setAttribute('viewBox', `0 0 ${size.width} ${size.height}`)
+  const w = Math.max(1, Math.round(size.width * k))
+  const h = Math.max(1, Math.round(size.height * k))
+  svg.setAttribute('width', String(w))
+  svg.setAttribute('height', String(h))
+  const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' }))
+  try {
+    const img = new Image()
+    img.src = url
+    await img.decode()
+    const c = document.createElement('canvas')
+    c.width = w
+    c.height = h
+    const ctx = c.getContext('2d')!
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, w, h)
+    ctx.drawImage(img, 0, 0, w, h)
+    return c.toDataURL('image/png').split(',')[1]
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
 
 /** "Create a…", "Draw…" and so on start new artwork rather than editing what's there. */
 const CREATE_WORDS = /^\s*(please\s+)?(create|draw|generate|design|sketch|illustrate|make\s+(me\s+)?(a|an)\s+new)\b/i
@@ -219,47 +264,72 @@ export class AiPanel {
       this.$.usage.textContent = `${(used.input + used.output).toLocaleString()} tokens${used.cost !== null ? ` · ~$${used.cost.toFixed(4)}` : ''}`
       this.$.usage.title = `${used.input.toLocaleString()} in, ${used.output.toLocaleString()} out`
     }
-    try {
-      // one go, plus one automatic retry if the reply is cut off or broken
-      for (let attempt = 0; attempt < 2; attempt++) {
-        phase = attempt ? `${FAMILIES[family].short} is fixing its reply` : `${creating ? 'Creating' : 'Editing'} with ${FAMILIES[family].short}`
-        chars = 0
-        thought = null
-        showStatus()
-        const r = await generate(this.settings, family, thinkingLevel, SYSTEM, turns, this.abort.signal, (n, t) => {
-          if (n !== chars || t !== thought) {
-            chars = n
-            thought = t
-            showStatus()
-          }
-        })
-        tally(r)
-        if (r.note) this.log('note', r.note)
-        const cut = r.finish === 'MAX_TOKENS'
-        const err = cut ? 'the reply was cut off before the end' : this.host.propose(target, cleanReply(r.text))
-        if (!err) {
-          status.remove()
-          this.pending = target
-          this.$.ptext.textContent = `Previewing ${creating ? 'new artwork' : `a change to ${target.label}`}.`
-          this.$.proposal.hidden = false
-          return
+    const short = FAMILIES[family].short
+    const ask = async (label: string) => {
+      phase = label
+      chars = 0
+      thought = null
+      showStatus()
+      const r = await generate(this.settings!, family, thinkingLevel, SYSTEM, turns, this.abort!.signal, (n, t) => {
+        if (n !== chars || t !== thought) {
+          chars = n
+          thought = t
+          showStatus()
         }
+      })
+      tally(r)
+      if (r.note) this.log('note', r.note)
+      return r
+    }
+    /** A usable reply: the answer, plus one automatic retry if it's cut off or broken. */
+    const usable = async (label: string): Promise<string | null> => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const r = await ask(attempt ? `${short} is fixing its reply` : label)
+        const svg = cleanReply(r.text)
+        const cut = r.finish === 'MAX_TOKENS'
+        const err = cut ? 'the reply was cut off before the end' : this.host.propose(target, svg, false)
+        turns.push({ role: 'model', text: r.text })
+        if (!err) return svg
         if (attempt) {
-          status.remove()
           this.log('error', `The reply still couldn't be used: ${err}`)
-          return
+          return null
         }
         this.log('note', `That reply couldn't be used (${err}), so I've asked it to fix it.`)
-        turns.push(
-          { role: 'model', text: r.text },
-          {
-            role: 'user',
-            text: cut
-              ? 'Your reply was cut off before the end. Reply again with the complete SVG, written more compactly: reuse pieces with <defs> and <use>, and drop anything decorative that isn\'t needed. SVG only.'
-              : `Your reply can't be used: ${err}. Reply again with the complete, corrected SVG only.`,
-          },
-        )
+        turns.push({
+          role: 'user',
+          text: cut
+            ? "Your reply was cut off before the end. Reply again with the complete SVG, written more compactly: reuse pieces with <defs> and <use>, and drop anything decorative that isn't needed. SVG only."
+            : `Your reply can't be used: ${err}. Reply again with the complete, corrected SVG only.`,
+        })
       }
+      return null
+    }
+    try {
+      let svg = await usable(`${creating ? 'Creating' : 'Editing'} with ${short}`)
+      if (svg === null) return
+      // self-review: show the model what it actually drew and let it fix what it sees
+      if (creating && this.settings.selfReview) {
+        let image: string | null = null
+        try {
+          image = await renderPng(svg)
+        } catch (e) {
+          this.log('note', `Couldn't render the artwork for self-review (${(e as Error).message}), so it wasn't reviewed.`)
+        }
+        if (image) {
+          turns.push({ role: 'user', text: REVIEW, image })
+          const reviewed = await usable(`${short} is checking its drawing`)
+          if (reviewed !== null) {
+            if (reviewed.trim() !== svg.trim()) this.log('note', 'Self-review made fixes.')
+            else this.log('note', 'Self-review found nothing to fix.')
+            svg = reviewed
+          } else this.log('note', 'Kept the version from before the review.')
+        }
+      }
+      const err = this.host.propose(target, svg)
+      if (err) return this.log('error', `The reply couldn't be used: ${err}`)
+      this.pending = target
+      this.$.ptext.textContent = `Previewing ${creating ? 'new artwork' : `a change to ${target.label}`}.`
+      this.$.proposal.hidden = false
     } catch (e) {
       status.remove()
       const aborted = e instanceof DOMException && e.name === 'AbortError'
