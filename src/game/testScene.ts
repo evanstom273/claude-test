@@ -1,4 +1,4 @@
-import { bake } from './art/bake'
+import { bake, inBatches } from './art/bake'
 import { flowersSvg, grassSvg, GRASS_TILE, stoneSvg } from './art/ground'
 import { SORCERER_SIZE, sorcererSvg, type SorcererMode } from './art/sorcererArt.js'
 import { PLAYER } from './data/player'
@@ -55,7 +55,7 @@ export class TestScene {
     this.resize()
     const s = this.bakeScale
     const { w, h } = SORCERER_SIZE
-    const jobs: Promise<void>[] = []
+    const jobs: (() => Promise<void>)[] = []
     let done = 0
     const total = 8 * (1 + FRAMES * 2)
     const tick = () => onProgress(++done / total)
@@ -63,9 +63,9 @@ export class TestScene {
       const a = (d * Math.PI) / 4
       const fr: Frames = { idle: null!, walk: [], sprint: [] }
       this.frames.push(fr)
-      jobs.push(bake(sorcererSvg(a, 'idle', 0), w, h, s).then((c) => void ((fr.idle = c), tick())))
+      jobs.push(() => bake(sorcererSvg(a, 'idle', 0), w, h, s).then((c) => void ((fr.idle = c), tick())))
       for (const mode of ['walk', 'sprint'] as const)
-        for (let i = 0; i < FRAMES; i++) jobs.push(bake(sorcererSvg(a, mode, i / FRAMES), w, h, s).then((c) => void ((fr[mode][i] = c), tick())))
+        for (let i = 0; i < FRAMES; i++) jobs.push(() => bake(sorcererSvg(a, mode, i / FRAMES), w, h, s).then((c) => void ((fr[mode][i] = c), tick())))
     }
     const tile = await bake(grassSvg(), GRASS_TILE, GRASS_TILE, s)
     this.grass = this.ctx.createPattern(tile, 'repeat')!
@@ -81,7 +81,7 @@ export class TestScene {
       if (Math.hypot(x, y) < m(2.5)) continue
       this.props.push({ x, y, img: pick.img, ax: pick.w / 2, ay: pick.h - 6 })
     }
-    await Promise.all(jobs)
+    await inBatches(jobs)
   }
 
   start() {
@@ -95,7 +95,8 @@ export class TestScene {
     }
     this.last = performance.now()
     const loop = (now: number) => {
-      const dt = Math.min(0.05, (now - this.last) / 1000)
+      // rAF timestamps can be slightly older than performance.now(), so clamp at zero
+      const dt = Math.max(0, Math.min(0.05, (now - this.last) / 1000))
       this.last = now
       this.update(dt)
       this.render()
@@ -133,7 +134,7 @@ export class TestScene {
     const dx = tx - this.vx
     const dy = ty - this.vy
     const d = Math.hypot(dx, dy)
-    if (d <= rate) {
+    if (d <= rate || d === 0) {
       this.vx = tx
       this.vy = ty
     } else {

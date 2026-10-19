@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { bakeStats } from './game/art/bake'
 import { TestScene } from './game/testScene'
 
 export default function App() {
@@ -8,6 +9,7 @@ export default function App() {
 
   useEffect(() => {
     const scene = new TestScene(canvas.current!)
+    if (import.meta.env.DEV) (window as unknown as { __scene: TestScene }).__scene = scene
     let alive = true
     scene.load((k) => alive && setProgress(k)).then(() => {
       if (!alive) return
@@ -39,6 +41,10 @@ export default function App() {
           <div>Move: WASD / arrows / left stick</div>
           <div>Sprint: hold Shift or Space / B</div>
           <div>Touch: drag to move, push to the outer ring to sprint</div>
+          <div className="mt-1 text-[#878a84]">
+            Art loaded: {bakeStats.done - bakeStats.blank}/{bakeStats.done}
+            {bakeStats.blank > 0 && <span className="text-[#c46a6a]"> ({bakeStats.blank} blank)</span>}
+          </div>
         </div>
       )}
     </div>
