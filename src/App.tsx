@@ -1,18 +1,54 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { Game, SPEEDS } from './game'
-import type { Tool } from './sim/sim'
+import { WORLD_SIZES, type Tool, type WorldSize } from './sim/sim'
 import { TOOL_INFO, ToolIcon } from './ui/icons'
 import { Inspector, PopulationGraph, SpeciesList } from './ui/Panels'
 
 const TOOLS: Tool[] = ['inspect', 'raise', 'lower', 'plants', 'rain', 'spawn', 'meteor']
 
 export default function App() {
+  const [size, setSize] = useState<WorldSize | null>(null)
+  // a fresh key per world, so making a new one starts from scratch
+  const [run, setRun] = useState(0)
+  if (!size) return <Menu onStart={(s) => (setSize(s), setRun((r) => r + 1))} />
+  return <World key={run} size={size} onNew={() => setSize(null)} />
+}
+
+function Menu({ onStart }: { onStart: (s: WorldSize) => void }) {
+  const [pick, setPick] = useState<WorldSize>('small')
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-[#0e1512] p-4">
+      <div className="w-full max-w-sm text-center">
+        <div className="text-3xl tracking-[0.25em] text-[#e3c580]">PRIMORDIA</div>
+        <div className="mt-1 text-xs text-[#9aa29a]">working title · shape a world and watch life find its way</div>
+        <div className="mt-8 grid grid-cols-2 gap-2">
+          {(Object.keys(WORLD_SIZES) as WorldSize[]).map((k) => {
+            const ws = WORLD_SIZES[k]
+            return (
+              <button key={k} onClick={() => setPick(k)} className={`panel px-3 py-3 text-left ${pick === k ? 'ring-2 ring-[#e3c580]' : ''}`}>
+                <div className="text-[#ece6d6]">{ws.label}</div>
+                <div className="text-[11px] text-[#9aa29a]">
+                  {ws.cells} × {ws.cells}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+        <button onClick={() => onStart(pick)} className="btn btn-on mt-6 px-6 py-2 text-base">
+          Create a world
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function World({ size, onNew }: { size: WorldSize; onNew: () => void }) {
   const canvas = useRef<HTMLCanvasElement>(null)
   const [game, setGame] = useState<Game | null>(null)
   const [progress, setProgress] = useState(0)
 
   useEffect(() => {
-    const g = new Game(canvas.current!)
+    const g = new Game(canvas.current!, size)
     let alive = true
     if (import.meta.env.DEV) (window as unknown as { __game: Game }).__game = g
     g.load((k) => alive && setProgress(k)).then(() => {
@@ -24,7 +60,7 @@ export default function App() {
       alive = false
       g.dispose()
     }
-  }, [])
+  }, [size])
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-[#1d3f58] select-none">
@@ -33,23 +69,23 @@ export default function App() {
         <div className="absolute inset-0 flex items-center justify-center bg-[#0e1512]">
           <div className="w-64 text-center">
             <div className="text-2xl tracking-[0.25em] text-[#e3c580]">PRIMORDIA</div>
-            <div className="mt-1 text-xs text-[#9aa29a]">working title · shaping a world</div>
+            <div className="mt-1 text-xs text-[#9aa29a]">raising an island…</div>
             <div className="mt-4 h-1 bg-white/10">
               <div className="h-full bg-[#e3c580]" style={{ width: `${progress * 100}%` }} />
             </div>
           </div>
         </div>
       )}
-      {game && <Hud game={game} />}
+      {game && <Hud game={game} onNew={onNew} />}
     </div>
   )
 }
 
-function Hud({ game }: { game: Game }) {
+function Hud({ game, onNew }: { game: Game; onNew: () => void }) {
   const s = useSyncExternalStore(game.subscribe, game.getSnapshot)
   const [panel, setPanel] = useState(() => window.innerWidth > 720)
   const [graph, setGraph] = useState(false)
-  const day = Math.floor(s.time / 10) + 1
+  const day = Math.floor(s.time / 30) + 1
   const events = s.events.slice(-3)
   return (
     <>
@@ -74,6 +110,9 @@ function Hud({ game }: { game: Game }) {
       {/* species panel */}
       <div className="absolute right-3 top-3 flex max-h-[calc(100%-7.5rem)] flex-col items-end gap-2" style={{ top: 'max(0.75rem, env(safe-area-inset-top))' }}>
         <div className="flex gap-2">
+          <button className="btn" onClick={() => confirm('Leave this world and make a new one?') && onNew()}>
+            New world
+          </button>
           <button className={`btn ${graph ? 'btn-on' : ''}`} onClick={() => setGraph(!graph)}>
             Graph
           </button>

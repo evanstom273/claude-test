@@ -5,7 +5,15 @@ import { HISTORY_STEP, SpeciesRegistry, type Species } from './species'
 import { World } from './world'
 
 export const TICK = 0.1
-export const MAX_CREATURES = 1600
+
+/** The four world sizes: each has twice the land of the one before. */
+export const WORLD_SIZES = {
+  small: { label: 'Small', cells: 181, cap: 900 },
+  medium: { label: 'Medium', cells: 256, cap: 1400 },
+  large: { label: 'Large', cells: 362, cap: 2000 },
+  huge: { label: 'Huge', cells: 512, cap: 2800 },
+} as const
+export type WorldSize = keyof typeof WORLD_SIZES
 const GRID = 4
 
 export type Tool = 'inspect' | 'raise' | 'lower' | 'plants' | 'rain' | 'spawn' | 'meteor'
@@ -49,17 +57,27 @@ export class Simulation {
   private grid: number[][] = []
   private byId = new Map<number, Creature>()
 
-  constructor(seed = Math.floor(Math.random() * 1e9)) {
+  /** Most creatures alive at once, so a phone can keep up. */
+  readonly cap: number
+
+  constructor(size: WorldSize = 'small', seed = Math.floor(Math.random() * 1e9)) {
     this.r = rng(seed)
-    this.world = new World(128, seed)
+    this.world = new World(WORLD_SIZES[size].cells, seed)
+    this.cap = WORLD_SIZES[size].cap
     this.species = new SpeciesRegistry(this.r)
     // three founding species: two grazers and a small hunter
-    this.seedSpecies(randomGenome(this.r, 0.05), 26)
-    this.seedSpecies(randomGenome(this.r, 0.15), 22)
+    const herds = Math.max(1, Math.round(this.world.size / 128))
     const hunter = randomGenome(this.r, 0.85)
     hunter.size = 0.9 + this.r() * 0.4
     hunter.speed = Math.max(hunter.speed, 1.2)
-    this.seedSpecies(hunter, 7)
+    for (const [g, n] of [
+      [randomGenome(this.r, 0.05), 26],
+      [randomGenome(this.r, 0.15), 22],
+      [hunter, 7],
+    ] as [Genome, number][]) {
+      const sp = this.seedSpecies(g, n)
+      for (let h = 1; h < herds; h++) this.addHerd(sp, g, n)
+    }
     this.sampleHistory()
   }
 
@@ -81,6 +99,11 @@ export class Simulation {
 
   seedSpecies(g: Genome, count: number, at?: [number, number]) {
     const sp = this.species.found(g, this.time)
+    this.addHerd(sp, g, count, at)
+    return sp
+  }
+
+  private addHerd(sp: Species, g: Genome, count: number, at?: [number, number]) {
     const [cx, cy] = at ?? this.landSpot()
     for (let i = 0; i < count; i++) {
       const x = cx + (this.r() - 0.5) * 6
@@ -90,7 +113,6 @@ export class Simulation {
       c.age = this.r() * maturity(g)
       c.energy = c.maxEnergy * (0.5 + this.r() * 0.3)
     }
-    return sp
   }
 
   private spawn(sp: Species, g: Genome, x: number, y: number, parent: Creature | null, generation: number): Creature {
@@ -119,7 +141,9 @@ export class Simulation {
       state: 'wander',
       wanderAngle: this.r() * Math.PI * 2,
       wanderTimer: 0,
-      breedCooldown: 6 + this.r() * 6,
+      breedCooldown: 20 + this.r() * 20,
+      thinkTimer: this.r() * 0.4,
+      threat: null,
       prey: null,
       lunge: 0,
       alive: true,
@@ -230,7 +254,18 @@ export class Simulation {
     const hunts = isPredator(g)
     let bestPrey: Creature | null = null
     let bestPreyScore = Infinity
-    this.near(c.x, c.y, g.sense, (o) => {
+    // looking around is the expensive part, so each creature only does it a few times a second
+    c.thinkTimer -= dt
+    const looks = c.thinkTimer <= 0
+    if (looks) c.thinkTimer = 0.35 + this.r() * 0.15
+    else if (c.threat !== null) {
+      const o = this.byId.get(c.threat)
+      if (o && o.alive && Math.hypot(o.x - c.x, o.y - c.y) < g.sense) {
+        threat = o
+        threatD = Math.hypot(o.x - c.x, o.y - c.y)
+      }
+    }
+    if (looks) this.near(c.x, c.y, g.sense, (o) => {
       if (o === c || !o.alive || o.species === c.species) return
       const d = Math.hypot(o.x - c.x, o.y - c.y)
       if (isPredator(o.genome) && o.genome.size > g.size * 0.6 && d < Math.min(g.sense, 6) * 0.7 && d < threatD) {
@@ -249,6 +284,7 @@ export class Simulation {
     })
     if (hunts && !prey && bestPrey && c.energy < c.maxEnergy * 0.6) prey = bestPrey
     c.prey = prey?.id ?? null
+    if (looks) c.threat = (threat as Creature | null)?.id ?? null
 
     let want = 0 // 0 stop, 1 walk, 1.25 run
     let heading = c.angle
@@ -342,7 +378,7 @@ export class Simulation {
     if (c.energy <= 0 || c.age > g.lifespan) c.alive = false
 
     // breeding: a well-fed adult splits off a child
-    if (c.alive && c.age > maturity(g) && c.breedCooldown <= 0 && c.energy > c.maxEnergy * (0.85 - g.fertility * 0.15) && this.creatures.length < MAX_CREATURES) {
+    if (c.alive && c.age > maturity(g) && c.breedCooldown <= 0 && c.energy > c.maxEnergy * (0.85 - g.fertility * 0.15) && this.creatures.length < this.cap) {
       this.breed(c)
     }
   }
@@ -359,7 +395,7 @@ export class Simulation {
     child.energy = Math.min(child.maxEnergy, gift)
     c.energy -= gift + 4
     c.children++
-    c.breedCooldown = 8 + (1.5 - c.genome.fertility) * 10 + this.r() * 4
+    c.breedCooldown = 30 + (1.5 - c.genome.fertility) * 30 + this.r() * 15
     this.births.push({ x, y, t: this.time })
   }
 
