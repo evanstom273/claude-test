@@ -20,12 +20,19 @@ export interface Draft {
   svg: string
 }
 
+/** The two models the studio offers. */
+export type ModelFamily = 'lite' | 'flash'
+export type Thinking = 'default' | 'low' | 'high'
+
 export interface AiSettings {
   apiKey: string
-  model: string
-  /** Optional, for cost estimates: US dollars per million tokens. */
-  priceIn: number | null
-  priceOut: number | null
+  /** Model for edits to existing artwork, and for creating new artwork. */
+  editModel: ModelFamily
+  createModel: ModelFamily
+  thinkingEdit: Thinking
+  thinkingCreate: Thinking
+  /** Optional, for cost estimates: US dollars per million tokens, per model. */
+  prices: Record<ModelFamily, { in: number | null; out: number | null }>
 }
 
 export interface Usage {
@@ -70,8 +77,20 @@ const putMeta = (key: string, value: unknown) => db.meta.put({ key, value })
 export const getDraft = () => getMeta<Draft>('draft')
 export const putDraft = (draft: Draft) => putMeta('draft', draft)
 
-export const DEFAULT_AI: AiSettings = { apiKey: '', model: '', priceIn: null, priceOut: null }
-export const getAiSettings = async () => ({ ...DEFAULT_AI, ...(await getMeta<Partial<AiSettings>>('ai')) })
+export const DEFAULT_AI: AiSettings = {
+  apiKey: '',
+  editModel: 'lite',
+  createModel: 'lite',
+  thinkingEdit: 'default',
+  thinkingCreate: 'high',
+  prices: { lite: { in: null, out: null }, flash: { in: null, out: null } },
+}
+export const getAiSettings = async (): Promise<AiSettings> => {
+  // earlier versions stored one model id and one pair of prices
+  const s = (await getMeta<Partial<AiSettings> & { priceIn?: number | null; priceOut?: number | null }>('ai')) ?? {}
+  const prices = s.prices ?? { ...DEFAULT_AI.prices, lite: { in: s.priceIn ?? null, out: s.priceOut ?? null } }
+  return { ...DEFAULT_AI, ...s, prices: { ...DEFAULT_AI.prices, ...prices } }
+}
 export const putAiSettings = (s: AiSettings) => putMeta('ai', s)
 
 export const addUsage = (u: Usage) => db.usage.add(u)

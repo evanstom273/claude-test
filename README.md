@@ -14,7 +14,7 @@ The start of a cartoon studio in the browser, at https://evanstom273.github.io/c
 - **Source sync:** every change from the canvas, layers or inspector writes only the affected characters of the source (`sourceMap.ts`), so it's one undo step and the rest of the code is untouched. Moving the code cursor selects the element on the canvas.
 - **Code editor:** CodeMirror 6, with SVG autocomplete, validation, formatting and lint markers. If the code is broken, the canvas keeps the last valid version.
 - **Safety:** previews are sanitised (no scripts, event attributes or external resources) and rendered in a shadow root.
-- **AI assistant:** Gemini, with your own key stored on this device. It edits the selected element (or the whole artwork) and shows the result on the canvas to accept or reject; accepted changes go into undo history. It also shows token usage, optional cost estimates from prices you enter, and lets you cancel a request.
+- **AI assistant:** Gemini (3.1 Flash-Lite or 3.8 Flash, chosen separately for editing and creating, each with a thinking level), with your own key stored on this device. "Create…" requests or a blank canvas get a creation prompt; everything else edits the selection or the whole artwork. The prompt teaches construction tricks (`<use>` + rotate, dash-array rings) instead of hand-calculated coordinates, and a broken or cut-off reply is sent back once to be fixed. Results are previewed on the canvas to accept or reject, and accepted changes go into undo history. It also shows token usage, optional cost estimates from prices you enter, and lets you cancel a request.
 - **Storage:** Dexie (IndexedDB) holds artworks, the autosaved working copy, AI settings and usage history.
 
 ## The Dorseys: "Smart Toast"
