@@ -61,8 +61,8 @@ export interface GeminiResult {
   note?: string
 }
 
-/** Progress while a reply streams in: how many characters of the answer have arrived so far. */
-export type Progress = (chars: number) => void
+/** Progress while a reply streams in: characters of the answer so far, and the latest thinking summary. */
+export type Progress = (chars: number, thought: string | null) => void
 
 export async function generate(settings: AiSettings, family: ModelFamily, thinking: Thinking, system: string, turns: Turn[], signal: AbortSignal, onProgress: Progress = () => {}): Promise<GeminiResult> {
   if (!resolved[family]) await resolveModels(settings.apiKey).catch(() => {})
@@ -75,17 +75,18 @@ export async function generate(settings: AiSettings, family: ModelFamily, thinki
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: turns.map((t) => ({ role: t.role, parts: [{ text: t.text }] })),
-        ...(withThinking && thinking !== 'default' ? { generationConfig: { thinkingConfig: { thinkingLevel: thinking } } } : {}),
+        // includeThoughts streams short summaries of the model's thinking, shown in the status bar
+        ...(withThinking ? { generationConfig: { thinkingConfig: { includeThoughts: true, ...(thinking !== 'default' ? { thinkingLevel: thinking } : {}) } } } : {}),
       }),
     })
   let note: string | undefined
   let res = await call(!noThinking.has(model))
-  if (!res.ok && res.status === 400 && thinking !== 'default' && !noThinking.has(model)) {
+  if (!res.ok && res.status === 400 && !noThinking.has(model)) {
     // if this model won't take a thinking level, try again without one
     const msg = await errorText(res)
     if (/think/i.test(msg)) {
       noThinking.add(model)
-      note = `${FAMILIES[family].short} doesn't accept a thinking level, so it used its default.`
+      note = `${FAMILIES[family].short} doesn't accept thinking settings, so it used its defaults${thinking !== 'default' ? ` instead of ${thinking} thinking` : ''}.`
       res = await call(false)
     } else throw new Error(msg)
   }
@@ -98,6 +99,7 @@ export async function generate(settings: AiSettings, family: ModelFamily, thinki
     error?: { message?: string }
   }
   let text = ''
+  let thought: string | null = null
   let finish = ''
   let usage: Chunk['usageMetadata'] = {}
   const reader = res.body!.pipeThrough(new TextDecoderStream()).getReader()
@@ -108,10 +110,14 @@ export async function generate(settings: AiSettings, family: ModelFamily, thinki
     if (c.error) throw new Error(c.error.message ?? 'Gemini reported an error')
     if (c.promptFeedback?.blockReason) throw new Error(`Gemini blocked the request (${c.promptFeedback.blockReason})`)
     const cand = c.candidates?.[0]
-    for (const part of cand?.content?.parts ?? []) if (!part.thought && part.text) text += part.text
+    for (const part of cand?.content?.parts ?? []) {
+      if (!part.text) continue
+      if (part.thought) thought = summary(part.text)
+      else text += part.text
+    }
     if (cand?.finishReason) finish = cand.finishReason
     if (c.usageMetadata) usage = c.usageMetadata
-    onProgress(text.length)
+    onProgress(text.length, thought)
   }
   for (;;) {
     const { value, done } = await reader.read()
@@ -133,6 +139,13 @@ export async function generate(settings: AiSettings, family: ModelFamily, thinki
   await addUsage({ time: Date.now(), model, input, output, cost })
   if (!text.trim()) throw new Error(`Gemini returned nothing${finish ? ` (${finish})` : ''}`)
   return { text, finish: finish || 'STOP', input, output, cost, model, note }
+}
+
+/** A thinking summary as one short line: its bold heading if it has one, otherwise its first sentence. */
+function summary(t: string) {
+  const head = /\*\*(.+?)\*\*/.exec(t)?.[1]
+  const line = (head ?? t.replace(/[*#_`]/g, '').trim().split(/(?<=[.!?])\s|\n/)[0] ?? '').trim()
+  return line || null
 }
 
 /** Settings dialog: key, models, thinking, optional prices, and usage so far. Resolves with the saved settings. */
