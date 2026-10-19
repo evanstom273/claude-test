@@ -1,4 +1,4 @@
-import { generate, settingsDialog } from './gemini'
+import { FAMILIES, generate, settingsDialog, type GeminiResult, type Turn } from './gemini'
 import { getAiSettings, type AiSettings } from './store'
 
 /**
@@ -19,6 +19,8 @@ export interface AiTarget {
 
 export interface AiHost {
   source(): string
+  /** True when the artwork has nothing drawn in it yet. */
+  blank(): boolean
   /** The selected element, if any and if the code is valid. */
   selection(): AiTarget | null
   /** Show a proposal on the canvas; returns an error message if it doesn't work. */
@@ -27,15 +29,32 @@ export interface AiHost {
   reject(): void
 }
 
-const SYSTEM = `You edit SVG artwork for a cartoon studio. Reply with SVG markup only: no explanation and no Markdown code fences.
-Rules:
-- Change only what the instruction asks for. Keep existing id attributes, group structure and unrelated elements exactly as they are.
-- Write clean, readable SVG with sensible indentation.
-- Never use <script>, <foreignObject>, event attributes (onclick and so on) or links to external files.
-- Any new gradients, filters, masks or clip paths need ids that don't clash with existing ones.`
+const SYSTEM = `You are the artwork engine of a cartoon studio. You write SVG source code.
+Reply with SVG markup only: no explanation and no Markdown code fences.
 
+Safety: never use <script>, <foreignObject>, event attributes (onclick and so on) or links to external files. Any new gradients, filters, masks or clip paths need ids that don't clash with existing ones.
+
+Building accurately. You can't measure, so don't hand-calculate dozens of coordinates. Instead:
+- Work out the key numbers first (centre point, radii, sizes, angles) and use them consistently everywhere.
+- Repeated or radial parts (segments, spokes, petals, teeth, clock marks, tiles, rows of windows): draw ONE piece inside <defs> and place copies with <use href="#piece" transform="rotate(angle cx cy)"/> or translate(). For n pieces round a circle, the angle step is 360/n degrees.
+- Ring segments and alternating colours round a circle: use a <circle> with a thick stroke and stroke-dasharray instead of arc paths. The stroke sits centred on the radius r, so a ring from r1 to r2 is a circle with r=(r1+r2)/2 and stroke-width=r2-r1. Its circumference is C=2*pi*r; n equal segments each take C/n. Two colours alternate with two circles, each stroke-dasharray="C/n C/n", the second rotated by 360/n degrees. Rotate the circle to set where segment one starts (dashes start at 3 o'clock and run clockwise).
+- Text round a circle: one <text> per label with text-anchor="middle" and dominant-baseline="central", positioned at the top and turned into place with transform="rotate(angle cx cy)".
+- Prefer basic shapes (circle, ellipse, rect, line, polygon) with transforms over long hand-made paths. When you do write paths, keep them simple and smooth.
+- Finish everything. Every repeated part must actually be in the reply. Never leave placeholders, "...", or comments like "repeat for the rest".
+- If the subject is a real thing with a known design (a dartboard, a flag, a clock face, a playing card), reproduce its real layout accurately: the right counts, order, proportions and colours.`
+
+const CREATE_RULE = `You are CREATING new artwork from a description.
+- Keep the current document's width, height and viewBox, and fill that canvas sensibly, centred.
+- Make it complete and polished in whatever style the user asks for. If they don't name a style, use the studio's cartoon style: clean dark outlines (#1a1410), solid colours with simple layered shading and highlights, bold readable shapes.
+- Organise it into groups with descriptive ids (for example id="board", id="numbers") so parts can be selected and edited later.
+- Return one complete SVG document: a single <svg> root with xmlns="http://www.w3.org/2000/svg".`
+
+const EDIT_RULE = `You are EDITING existing artwork. Change only what the instruction asks for. Keep existing ids, group structure and unrelated elements exactly as they are.`
 const ELEMENT_RULE = `Return a replacement for exactly the TARGET element and nothing else: a single element. If the change needs new gradients or filters, you may return a <g> that holds a <defs> and the edited element, keeping the element's own id on it.`
 const WHOLE_RULE = `Return one complete SVG document: a single <svg> root with xmlns="http://www.w3.org/2000/svg".`
+
+/** "Create a…", "Draw…" and so on start new artwork rather than editing what's there. */
+const CREATE_WORDS = /^\s*(please\s+)?(create|draw|generate|design|sketch|illustrate|make\s+(me\s+)?(a|an)\s+new)\b/i
 
 /** Pull the markup out of a reply, in case it came wrapped in fences or chatter. */
 export function cleanReply(text: string) {
@@ -115,7 +134,8 @@ export class AiPanel {
   /** Call when the selection changes. */
   refresh() {
     const s = this.settings
-    this.$.model.textContent = s?.apiKey && s.model ? s.model : 'Set up'
+    this.$.model.textContent = s?.apiKey ? FAMILIES[s.editModel].short : 'Set up'
+    this.$.model.title = s?.apiKey ? `Edits: ${FAMILIES[s.editModel].label} · Creating: ${FAMILIES[s.createModel].label}. Tap for settings.` : 'Set up the AI assistant'
     const sel = this.host.selection()
     const whole = this.wholeChosen || !sel
     this.$.target.textContent = whole ? 'Whole artwork' : `Selected: ${sel!.label}`
@@ -148,9 +168,9 @@ export class AiPanel {
     const ta = this.$.textarea as HTMLTextAreaElement
     const instruction = ta.value.trim()
     if (!instruction) return
-    if (!this.settings?.apiKey || !this.settings.model) {
+    if (!this.settings?.apiKey) {
       await this.openSettings()
-      if (!this.settings?.apiKey || !this.settings.model) return
+      if (!this.settings?.apiKey) return
     }
     if (this.pending) {
       this.host.reject()
@@ -160,35 +180,69 @@ export class AiPanel {
     const source = this.host.source()
     const sel = this.wholeChosen ? null : this.host.selection()
     const target: AiTarget = sel ?? { from: 0, to: source.length, text: source, label: 'the whole artwork', whole: true }
-    const prompt = target.whole
-      ? `${WHOLE_RULE}\n\nCURRENT DOCUMENT:\n${source}\n\nINSTRUCTION: ${instruction}`
-      : `${ELEMENT_RULE}\n\nDOCUMENT (for context only):\n${source}\n\nTARGET element to replace:\n${target.text}\n\nINSTRUCTION: ${instruction}`
+    const creating = target.whole && (this.host.blank() || CREATE_WORDS.test(instruction))
+    const family = creating ? this.settings.createModel : this.settings.editModel
+    const thinkingLevel = creating ? this.settings.thinkingCreate : this.settings.thinkingEdit
+    const prompt = creating
+      ? `${CREATE_RULE}\n\nCURRENT DOCUMENT:\n${source}\n\nDESCRIPTION: ${instruction}`
+      : target.whole
+        ? `${EDIT_RULE}\n${WHOLE_RULE}\n\nCURRENT DOCUMENT:\n${source}\n\nINSTRUCTION: ${instruction}`
+        : `${EDIT_RULE}\n${ELEMENT_RULE}\n\nDOCUMENT (for context only):\n${source}\n\nTARGET element to replace:\n${target.text}\n\nINSTRUCTION: ${instruction}`
     this.log('you', instruction)
     ta.value = ''
     this.abort = new AbortController()
     this.$.send.textContent = '■'
     this.$.send.setAttribute('aria-label', 'Cancel')
     this.$.send.title = 'Cancel'
-    const thinking = document.createElement('div')
-    thinking.className = 'msg note'
-    thinking.textContent = `Asking ${this.settings.model}…`
-    this.$.log.appendChild(thinking)
-    try {
-      const r = await generate(this.settings, SYSTEM, prompt, this.abort.signal)
-      thinking.remove()
+    const status = document.createElement('div')
+    status.className = 'msg note'
+    this.$.log.appendChild(status)
+    const turns: Turn[] = [{ role: 'user', text: prompt }]
+    const used = { input: 0, output: 0, cost: null as number | null }
+    const tally = (r: GeminiResult) => {
+      used.input += r.input
+      used.output += r.output
+      if (r.cost !== null) used.cost = (used.cost ?? 0) + r.cost
       this.$.usage.hidden = false
-      this.$.usage.textContent = `${(r.input + r.output).toLocaleString()} tokens${r.cost !== null ? ` · ~$${r.cost.toFixed(4)}` : ''}`
-      this.$.usage.title = `${r.input.toLocaleString()} in, ${r.output.toLocaleString()} out`
-      const err = this.host.propose(target, cleanReply(r.text))
-      if (err) this.log('error', `The reply couldn't be used: ${err}`)
-      else {
-        this.pending = target
-        this.$.ptext.textContent = `Previewing a change to ${target.label}.`
-        this.$.proposal.hidden = false
+      this.$.usage.textContent = `${(used.input + used.output).toLocaleString()} tokens${used.cost !== null ? ` · ~$${used.cost.toFixed(4)}` : ''}`
+      this.$.usage.title = `${used.input.toLocaleString()} in, ${used.output.toLocaleString()} out`
+    }
+    try {
+      // one go, plus one automatic retry if the reply is cut off or broken
+      for (let attempt = 0; attempt < 2; attempt++) {
+        status.textContent = attempt ? `Asking ${FAMILIES[family].short} to fix it…` : `${creating ? 'Creating' : 'Editing'} with ${FAMILIES[family].short}${thinkingLevel !== 'default' ? `, ${thinkingLevel} thinking` : ''}…`
+        const r = await generate(this.settings, family, thinkingLevel, SYSTEM, turns, this.abort.signal)
+        tally(r)
+        if (r.note) this.log('note', r.note)
+        const cut = r.finish === 'MAX_TOKENS'
+        const err = cut ? 'the reply was cut off before the end' : this.host.propose(target, cleanReply(r.text))
+        if (!err) {
+          status.remove()
+          this.pending = target
+          this.$.ptext.textContent = `Previewing ${creating ? 'new artwork' : `a change to ${target.label}`}.`
+          this.$.proposal.hidden = false
+          return
+        }
+        if (attempt) {
+          status.remove()
+          this.log('error', `The reply still couldn't be used: ${err}`)
+          return
+        }
+        this.log('note', `That reply couldn't be used (${err}), so I've asked it to fix it.`)
+        turns.push(
+          { role: 'model', text: r.text },
+          {
+            role: 'user',
+            text: cut
+              ? 'Your reply was cut off before the end. Reply again with the complete SVG, written more compactly: reuse pieces with <defs> and <use>, and drop anything decorative that isn\'t needed. SVG only.'
+              : `Your reply can't be used: ${err}. Reply again with the complete, corrected SVG only.`,
+          },
+        )
       }
     } catch (e) {
-      thinking.remove()
-      this.log(e instanceof DOMException && e.name === 'AbortError' ? 'note' : 'error', e instanceof DOMException && e.name === 'AbortError' ? 'Cancelled.' : (e as Error).message)
+      status.remove()
+      const aborted = e instanceof DOMException && e.name === 'AbortError'
+      this.log(aborted ? 'note' : 'error', aborted ? 'Cancelled.' : (e as Error).message)
     } finally {
       this.abort = null
       this.$.send.textContent = '↑'

@@ -1,4 +1,4 @@
-import { addUsage, clearUsage, getAiSettings, putAiSettings, usageTotals, type AiSettings } from './store'
+import { addUsage, clearUsage, getAiSettings, putAiSettings, usageTotals, type AiSettings, type ModelFamily, type Thinking } from './store'
 
 /**
  * Talks to the Gemini API straight from the browser, with the key stored on
@@ -7,22 +7,33 @@ import { addUsage, clearUsage, getAiSettings, putAiSettings, usageTotals, type A
 
 const API = 'https://generativelanguage.googleapis.com/v1beta'
 
-export interface GeminiResult {
-  text: string
-  input: number
-  output: number
-  cost: number | null
-  model: string
+/** The only two models on offer. The exact id is looked up from the key's model list. */
+export const FAMILIES: Record<ModelFamily, { label: string; short: string; match: RegExp; fallback: string }> = {
+  lite: { label: 'Gemini 3.1 Flash-Lite', short: '3.1 Flash-Lite', match: /^gemini-3\.1-flash-lite/i, fallback: 'gemini-3.1-flash-lite' },
+  flash: { label: 'Gemini 3.8 Flash', short: '3.8 Flash', match: /^gemini-3\.8-flash(?!-lite)/i, fallback: 'gemini-3.8-flash' },
 }
 
-export async function listModels(apiKey: string): Promise<{ id: string; label: string }[]> {
+/** Models that refused a thinking level this session, so it isn't sent again. */
+const noThinking = new Set<string>()
+
+/** Model ids found for this key, cached for the session. */
+const resolved: Partial<Record<ModelFamily, string>> = {}
+
+export async function resolveModels(apiKey: string) {
   const res = await fetch(`${API}/models?pageSize=1000`, { headers: { 'x-goog-api-key': apiKey } })
   if (!res.ok) throw new Error(await errorText(res))
-  const data = (await res.json()) as { models?: { name: string; displayName?: string; supportedGenerationMethods?: string[] }[] }
-  return (data.models ?? [])
-    .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
-    .map((m) => ({ id: m.name.replace(/^models\//, ''), label: m.displayName ?? m.name }))
+  const data = (await res.json()) as { models?: { name: string; supportedGenerationMethods?: string[] }[] }
+  const ids = (data.models ?? []).filter((m) => m.supportedGenerationMethods?.includes('generateContent')).map((m) => m.name.replace(/^models\//, ''))
+  const found: Partial<Record<ModelFamily, string>> = {}
+  for (const f of Object.keys(FAMILIES) as ModelFamily[]) {
+    // prefer the stable id over previews and experiments, then the shortest name
+    const c = ids.filter((id) => FAMILIES[f].match.test(id)).sort((a, b) => Number(/preview|exp/i.test(a)) - Number(/preview|exp/i.test(b)) || a.length - b.length)
+    if (c[0]) found[f] = resolved[f] = c[0]
+  }
+  return found
 }
+
+const modelId = (f: ModelFamily) => resolved[f] ?? FAMILIES[f].fallback
 
 async function errorText(res: Response) {
   try {
@@ -33,81 +44,113 @@ async function errorText(res: Response) {
   }
 }
 
-export async function generate(settings: AiSettings, system: string, prompt: string, signal: AbortSignal): Promise<GeminiResult> {
-  const res = await fetch(`${API}/models/${encodeURIComponent(settings.model)}:generateContent`, {
-    method: 'POST',
-    signal,
-    headers: { 'content-type': 'application/json', 'x-goog-api-key': settings.apiKey },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: system }] },
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    }),
-  })
+export interface Turn {
+  role: 'user' | 'model'
+  text: string
+}
+
+export interface GeminiResult {
+  text: string
+  /** Why it stopped: STOP is normal, MAX_TOKENS means the reply was cut off. */
+  finish: string
+  input: number
+  output: number
+  cost: number | null
+  model: string
+  /** Set if the thinking setting had to be dropped because the model refused it. */
+  note?: string
+}
+
+export async function generate(settings: AiSettings, family: ModelFamily, thinking: Thinking, system: string, turns: Turn[], signal: AbortSignal): Promise<GeminiResult> {
+  if (!resolved[family]) await resolveModels(settings.apiKey).catch(() => {})
+  const model = modelId(family)
+  const call = (withThinking: boolean) =>
+    fetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
+      method: 'POST',
+      signal,
+      headers: { 'content-type': 'application/json', 'x-goog-api-key': settings.apiKey },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: turns.map((t) => ({ role: t.role, parts: [{ text: t.text }] })),
+        ...(withThinking && thinking !== 'default' ? { generationConfig: { thinkingConfig: { thinkingLevel: thinking } } } : {}),
+      }),
+    })
+  let note: string | undefined
+  let res = await call(!noThinking.has(model))
+  if (!res.ok && res.status === 400 && thinking !== 'default' && !noThinking.has(model)) {
+    // if this model won't take a thinking level, try again without one
+    const msg = await errorText(res)
+    if (/think/i.test(msg)) {
+      noThinking.add(model)
+      note = `${FAMILIES[family].short} doesn't accept a thinking level, so it used its default.`
+      res = await call(false)
+    } else throw new Error(msg)
+  }
   if (!res.ok) throw new Error(await errorText(res))
   const data = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[]
+    candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] }; finishReason?: string }[]
     usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number }
     promptFeedback?: { blockReason?: string }
   }
   if (data.promptFeedback?.blockReason) throw new Error(`Gemini blocked the request (${data.promptFeedback.blockReason})`)
   const cand = data.candidates?.[0]
-  const text = cand?.content?.parts?.map((p) => p.text ?? '').join('') ?? ''
+  const text = cand?.content?.parts?.filter((p) => !p.thought).map((p) => p.text ?? '').join('') ?? ''
   const input = data.usageMetadata?.promptTokenCount ?? 0
   // thinking tokens are billed as output
   const output = (data.usageMetadata?.candidatesTokenCount ?? 0) + (data.usageMetadata?.thoughtsTokenCount ?? 0)
-  const cost = settings.priceIn !== null && settings.priceOut !== null ? (input * settings.priceIn + output * settings.priceOut) / 1e6 : null
-  await addUsage({ time: Date.now(), model: settings.model, input, output, cost })
+  const p = settings.prices[family]
+  const cost = p.in !== null && p.out !== null ? (input * p.in + output * p.out) / 1e6 : null
+  await addUsage({ time: Date.now(), model, input, output, cost })
   if (!text.trim()) throw new Error(`Gemini returned nothing${cand?.finishReason ? ` (${cand.finishReason})` : ''}`)
-  return { text, input, output, cost, model: settings.model }
+  return { text, finish: cand?.finishReason ?? 'STOP', input, output, cost, model, note }
 }
 
-/** Settings dialog: key, model, optional prices, and usage so far. Resolves with the saved settings. */
+/** Settings dialog: key, models, thinking, optional prices, and usage so far. Resolves with the saved settings. */
 export async function settingsDialog(): Promise<AiSettings | null> {
   const s = await getAiSettings()
   const totals = await usageTotals()
   const dlg = document.createElement('dialog')
   dlg.className = 'art-dialog'
+  const models = (name: string) => `<select name="${name}">${(Object.keys(FAMILIES) as ModelFamily[]).map((f) => `<option value="${f}">${FAMILIES[f].label}</option>`).join('')}</select>`
+  const think = (name: string) => `<select name="${name}"><option value="default">Model default</option><option value="low">Low</option><option value="high">High</option></select>`
+  const price = (f: ModelFamily) =>
+    `<div class="row-in"><span class="plabel">${FAMILIES[f].short}</span><label>Input<input name="${f}In" type="number" min="0" step="any" inputmode="decimal"></label><label>Output<input name="${f}Out" type="number" min="0" step="any" inputmode="decimal"></label></div>`
   dlg.innerHTML = `<form method="dialog">
     <h3>AI assistant settings</h3>
-    <label>Gemini API key<input name="key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key"></label>
-    <p class="hint">Stored only in this browser on this device, and sent only to Google's Gemini API.</p>
-    <label>Model<span class="row-in"><select name="model"></select><button type="button" class="load">Load models</button></span></label>
-    <p class="hint models-msg"></p>
-    <fieldset><legend>Prices for cost estimates (optional, $ per 1M tokens)</legend>
-      <span class="row-in"><label>Input<input name="pin" type="number" min="0" step="any" inputmode="decimal"></label><label>Output<input name="pout" type="number" min="0" step="any" inputmode="decimal"></label></span>
-    </fieldset>
+    <label>Gemini API key<span class="row-in"><input name="key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key"><button type="button" class="load">Check</button></span></label>
+    <p class="hint models-msg">Stored only in this browser on this device, and sent only to Google's Gemini API.</p>
+    <div class="row-in"><label>Model for edits${models('editModel')}</label><label>Thinking${think('thinkingEdit')}</label></div>
+    <div class="row-in"><label>Model for creating${models('createModel')}</label><label>Thinking${think('thinkingCreate')}</label></div>
+    <p class="hint">More thinking usually means better geometry and more complete artwork, but slower and with more output tokens.</p>
+    <fieldset><legend>Prices for cost estimates (optional, $ per 1M tokens)</legend>${price('lite')}${price('flash')}</fieldset>
     <p class="hint usage"></p>
     <div class="actions"><button type="button" class="clear-usage">Clear usage history</button><span></span><button value="cancel">Cancel</button><button value="save" class="primary">Save</button></div>
   </form>`
   const f = dlg.querySelector('form')!
-  const key = f.elements.namedItem('key') as HTMLInputElement
-  const model = f.elements.namedItem('model') as HTMLSelectElement
-  const pin = f.elements.namedItem('pin') as HTMLInputElement
-  const pout = f.elements.namedItem('pout') as HTMLInputElement
-  const msg = dlg.querySelector('.models-msg')!
-  key.value = s.apiKey
-  pin.value = s.priceIn?.toString() ?? ''
-  pout.value = s.priceOut?.toString() ?? ''
-  const setOptions = (opts: { id: string; label: string }[]) => {
-    model.innerHTML = ''
-    for (const o of opts) model.add(new Option(`${o.label} (${o.id})`, o.id))
-    if (s.model && !opts.some((o) => o.id === s.model)) model.add(new Option(s.model, s.model), 0)
-    model.value = s.model || preferred(opts) || opts[0]?.id || ''
+  const el = <T extends HTMLInputElement | HTMLSelectElement>(n: string) => f.elements.namedItem(n) as T
+  el<HTMLInputElement>('key').value = s.apiKey
+  el<HTMLSelectElement>('editModel').value = s.editModel
+  el<HTMLSelectElement>('createModel').value = s.createModel
+  el<HTMLSelectElement>('thinkingEdit').value = s.thinkingEdit
+  el<HTMLSelectElement>('thinkingCreate').value = s.thinkingCreate
+  for (const fam of Object.keys(FAMILIES) as ModelFamily[]) {
+    el<HTMLInputElement>(`${fam}In`).value = s.prices[fam].in?.toString() ?? ''
+    el<HTMLInputElement>(`${fam}Out`).value = s.prices[fam].out?.toString() ?? ''
   }
-  setOptions([])
-  const load = async () => {
-    if (!key.value.trim()) return (msg.textContent = 'Add your key first.')
-    msg.textContent = 'Loading models…'
+  const msg = dlg.querySelector('.models-msg')!
+  const check = async () => {
+    const key = el<HTMLInputElement>('key').value.trim()
+    if (!key) return (msg.textContent = 'Add your key first.')
+    msg.textContent = 'Checking…'
     try {
-      const opts = await listModels(key.value.trim())
-      setOptions(opts)
-      msg.textContent = `${opts.length} models available to your key.`
+      const found = await resolveModels(key)
+      msg.textContent = (Object.keys(FAMILIES) as ModelFamily[]).map((fam) => (found[fam] ? `✓ ${FAMILIES[fam].short} (${found[fam]})` : `✕ ${FAMILIES[fam].short} isn't available to this key`)).join('   ')
     } catch (e) {
-      msg.textContent = `Couldn't load models: ${(e as Error).message}`
+      msg.textContent = `Couldn't check the key: ${(e as Error).message}`
     }
   }
-  dlg.querySelector('.load')!.addEventListener('click', load)
-  if (s.apiKey) void load()
+  dlg.querySelector('.load')!.addEventListener('click', check)
+  if (s.apiKey) void check()
   const showUsage = (t: typeof totals) =>
     (dlg.querySelector('.usage')!.textContent = `Usage so far: ${t.requests} request${t.requests === 1 ? '' : 's'}, ${t.input.toLocaleString()} input + ${t.output.toLocaleString()} output tokens${t.cost !== null ? `, about $${t.cost.toFixed(4)}` : ''}.`)
   showUsage(totals)
@@ -121,19 +164,20 @@ export async function settingsDialog(): Promise<AiSettings | null> {
     dlg.addEventListener('close', async () => {
       dlg.remove()
       if (dlg.returnValue !== 'save') return resolve(null)
-      const num = (v: string) => (v.trim() === '' || !Number.isFinite(+v) ? null : +v)
-      const next: AiSettings = { apiKey: key.value.trim(), model: model.value, priceIn: num(pin.value), priceOut: num(pout.value) }
+      const num = (n: string) => {
+        const v = el<HTMLInputElement>(n).value
+        return v.trim() === '' || !Number.isFinite(+v) ? null : +v
+      }
+      const next: AiSettings = {
+        apiKey: el<HTMLInputElement>('key').value.trim(),
+        editModel: el<HTMLSelectElement>('editModel').value as ModelFamily,
+        createModel: el<HTMLSelectElement>('createModel').value as ModelFamily,
+        thinkingEdit: el<HTMLSelectElement>('thinkingEdit').value as Thinking,
+        thinkingCreate: el<HTMLSelectElement>('thinkingCreate').value as Thinking,
+        prices: { lite: { in: num('liteIn'), out: num('liteOut') }, flash: { in: num('flashIn'), out: num('flashOut') } },
+      }
       await putAiSettings(next)
       resolve(next)
     })
   })
-}
-
-/** Default to Gemini 3.1 Flash-Lite, as the spec asks; otherwise the newest Flash-Lite. */
-function preferred(opts: { id: string }[]) {
-  const named = opts.filter((o) => /3\.1-flash-lite/i.test(o.id)).sort((a, b) => a.id.length - b.id.length)[0]
-  if (named) return named.id
-  const lite = opts.filter((o) => /flash-lite/i.test(o.id) && !/preview|exp|tts|image|audio|live/i.test(o.id))
-  const ver = (id: string) => parseFloat(/gemini-(\d+(?:\.\d+)?)/.exec(id)?.[1] ?? '0')
-  return lite.sort((a, b) => ver(b.id) - ver(a.id))[0]?.id ?? opts.find((o) => /flash-lite/i.test(o.id))?.id
 }

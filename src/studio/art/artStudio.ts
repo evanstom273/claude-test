@@ -171,6 +171,7 @@ export class ArtStudio {
     q('.p-inspector').appendChild(this.inspector.el)
     this.ai = new AiPanel({
       source: () => this.source,
+      blank: () => this.valid && (this.els[0]?.children ?? []).every((c) => ['defs', 'title', 'desc', 'metadata', 'style'].includes(c.name)),
       selection: () => this.aiSelection(),
       propose: (t, r) => this.propose(t, r),
       accept: () => this.acceptProposal(),
