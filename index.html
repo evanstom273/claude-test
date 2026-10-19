@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#111" />
+    <title>The Dorseys: Smart Toast</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="stage">
+        <div id="screen"></div>
+        <div id="subs" hidden><span id="who"></span><span id="line"></span></div>
+        <button id="start" type="button"><span class="big">▶</span><span>Play “Smart Toast”</span><small>Sound on</small></button>
+      </div>
+      <div id="controls">
+        <button id="play" type="button" aria-label="Play">▶</button>
+        <button id="restart" type="button" aria-label="Restart">⟲</button>
+        <input id="scrub" type="range" min="0" max="1000" value="0" step="1" aria-label="Seek" />
+        <span id="time">0:00</span>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
