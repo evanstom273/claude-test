@@ -139,3 +139,66 @@ export function elementAt(els: SrcElement[], pos: number) {
   for (const e of els) if (pos >= e.start && pos <= e.end && (!best || e.start >= best.start)) best = e
   return best
 }
+
+/** An element's text, plus the whitespace before it on its line (so removing it leaves no blank line). */
+export function chunk(el: SrcElement, src: string) {
+  let s = el.start
+  while (s > 0 && (src[s - 1] === ' ' || src[s - 1] === '\t')) s--
+  if (s > 0 && src[s - 1] === '\n') s--
+  return { from: s, to: el.end, text: src.slice(el.start, el.end), lead: src.slice(s, el.start) }
+}
+
+/** The indentation used for an element's children (its own indent plus two spaces). */
+export function childIndent(el: SrcElement, src: string) {
+  let s = el.start
+  while (s > 0 && (src[s - 1] === ' ' || src[s - 1] === '\t')) s--
+  return src.slice(s, el.start) + '  '
+}
+
+/** Where new content goes inside an element: just before its closing tag. A self-closing element can't take children. */
+export function insertionPoint(el: SrcElement, src: string) {
+  if (el.selfClosing) return null
+  const close = src.lastIndexOf('</', el.end - 1)
+  // keep the closing tag on its own line
+  let p = close
+  while (p > el.openEnd && (src[p - 1] === ' ' || src[p - 1] === '\t')) p--
+  if (p > el.openEnd && src[p - 1] === '\n') p--
+  return p
+}
+
+/** All ids used in the source. */
+export function idsIn(src: string) {
+  return new Set([...src.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]))
+}
+
+/** A fresh id based on a name, not already taken. */
+export function uniqueId(base: string, taken: Set<string>) {
+  const stem = base.replace(/[^A-Za-z0-9_-]+/g, '-').replace(/-\d+$/, '') || 'shape'
+  for (let n = taken.has(stem) ? 2 : 1; ; n++) {
+    const id = n === 1 ? stem : `${stem}-${n}`
+    if (!taken.has(id)) {
+      taken.add(id)
+      return id
+    }
+  }
+}
+
+/** A copy of some markup with every id inside renamed (and references to them updated), so it can sit beside the original. */
+export function withFreshIds(markup: string, taken: Set<string>) {
+  const map = new Map<string, string>()
+  for (const m of markup.matchAll(/\sid="([^"]+)"/g)) if (!map.has(m[1])) map.set(m[1], uniqueId(m[1], taken))
+  let out = markup.replace(/(\sid=")([^"]+)(")/g, (_, a, id, b) => a + (map.get(id) ?? id) + b)
+  for (const [from, to] of map) {
+    const esc = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    out = out.replace(new RegExp(`url\\(#${esc}\\)`, 'g'), `url(#${to})`).replace(new RegExp(`(href=")#${esc}"`, 'g'), `$1#${to}"`)
+  }
+  return out
+}
+
+/** Re-indent a block of markup so its first line sits at `indent`, keeping relative indentation. */
+export function reindent(markup: string, fromIndent: string, indent: string) {
+  return markup
+    .split('\n')
+    .map((l, i) => (i === 0 ? l : l.startsWith(fromIndent) ? indent + l.slice(fromIndent.length) : l))
+    .join('\n')
+}

@@ -6,10 +6,20 @@ import Dexie, { type Table } from 'dexie'
  * Gemini API key) and AI usage history. Nothing is sent anywhere.
  */
 
+/**
+ * Editor information kept beside the SVG (never inside it), so exported
+ * artwork stays plain, portable SVG. Later parts of the studio add fields.
+ */
+export interface ArtMeta {
+  guides?: { x: number[]; y: number[] }
+  [key: string]: unknown
+}
+
 export interface Artwork {
   id: string
   name: string
   svg: string
+  meta?: ArtMeta
   created: number
   updated: number
 }
@@ -18,6 +28,7 @@ export interface Draft {
   id: string | null
   name: string
   svg: string
+  meta?: ArtMeta
 }
 
 /** The two models the studio offers. */
