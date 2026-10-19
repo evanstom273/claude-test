@@ -4,15 +4,18 @@
 
 The start of a cartoon studio in the browser, at https://evanstom273.github.io/claude-test/. So far it's the shell: a slide-out drawer with Home, Audio, Visuals, Writing and Timeline (`src/studio/`).
 
-### Art Studio (Visuals, phase 1)
+### Art Studio (Visuals)
 
-`src/studio/art/`: an SVG code editor with a live canvas preview.
+`src/studio/art/`: SVG source and canvas kept in step.
 
-- **Code editor:** CodeMirror 6, with SVG autocomplete, tag closing and matching, folding, search and replace, formatting, and errors highlighted on their line.
-- **Canvas:** shows the last valid version while the code is broken. You can pan and zoom (pinch on touch), turn on a grid in artwork units, and use preview mode.
-- **Safety:** artwork is checked and sanitised before display. Scripts, event attributes and external resources are stripped, and the preview sits in a shadow root so its styles can't leak into the studio.
-- **Files:** New, Open, Save, Save As, Import and Export `.svg`. Artwork is saved in IndexedDB on this device, and the working copy is autosaved so unsaved work survives a closed tab.
-- **Layouts:** side by side, stacked, code only and canvas only, with a draggable divider.
+- **Layout:** header, tools, layers, canvas, inspector, AI assistant and SVG source. On phones, the canvas sits above a tab bar.
+- **Canvas:** tap selects a top-level object, a quick second tap picks inside groups, and drag moves. Pan and zoom by drag, wheel or pinch.
+- **Layers and inspector:** the layers panel shows every element as a tree. The inspector edits ID, X, Y, width, height, rotation, fill and stroke.
+- **Source sync:** every change from the canvas, layers or inspector writes only the affected characters of the source (`sourceMap.ts`), so it's one undo step and the rest of the code is untouched. Moving the code cursor selects the element on the canvas.
+- **Code editor:** CodeMirror 6, with SVG autocomplete, validation, formatting and lint markers. If the code is broken, the canvas keeps the last valid version.
+- **Safety:** previews are sanitised (no scripts, event attributes or external resources) and rendered in a shadow root.
+- **AI assistant:** Gemini, with your own key stored on this device. It edits the selected element (or the whole artwork) and shows the result on the canvas to accept or reject; accepted changes go into undo history. It also shows token usage, optional cost estimates from prices you enter, and lets you cancel a request.
+- **Storage:** Dexie (IndexedDB) holds artworks, the autosaved working copy, AI settings and usage history.
 
 ## The Dorseys: "Smart Toast"
 
