@@ -173,7 +173,7 @@ export class ArtStudio {
       source: () => this.source,
       blank: () => this.valid && (this.els[0]?.children ?? []).every((c) => ['defs', 'title', 'desc', 'metadata', 'style'].includes(c.name)),
       selection: () => this.aiSelection(),
-      propose: (t, r) => this.propose(t, r),
+      propose: (t, r, show) => this.propose(t, r, show),
       accept: () => this.acceptProposal(),
       reject: () => this.rejectProposal(),
     })
@@ -415,7 +415,8 @@ export class ArtStudio {
     return { from: e.start, to: e.end, text: this.source.slice(e.start, e.end), label: id ? `#${id}` : `<${e.name}>`, whole: false }
   }
 
-  private propose(t: AiTarget, replacement: string): string | null {
+  /** Check a replacement; with show, also preview it on the canvas. Returns an error message if it doesn't work. */
+  private propose(t: AiTarget, replacement: string, show = true): string | null {
     if (!t.whole) {
       const check = parseSvg(`<svg xmlns="${SVG_NS}" xmlns:xlink="http://www.w3.org/1999/xlink">${replacement}</svg>`)
       if (!check.ok) return check.errors[0].message
@@ -425,6 +426,7 @@ export class ArtStudio {
     const next = src.slice(0, t.from) + replacement + src.slice(t.to)
     const r = parseSvg(next)
     if (!r.ok) return r.errors[0].message
+    if (!show) return null
     this.proposal = { from: t.from, to: t.to, insert: replacement }
     this.preview.show(r.svg)
     this.preview.select(null)
