@@ -1,5 +1,0 @@
-{
-  "potion": { "name": "Healing draught", "listed": false, "heal": 35 },
-  "signet": { "name": "The Reeve's signet" },
-  "whetstone": { "name": "A whetstone (your sword bites harder)", "damage": 3 }
-}
