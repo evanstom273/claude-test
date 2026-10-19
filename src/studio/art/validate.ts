@@ -43,6 +43,9 @@ export function parseSvg(source: string): ParseResult {
   if (root.localName !== 'svg') return { ok: false, errors: [{ message: `The root element must be <svg>, not <${root.localName}>`, line: 1 }] }
   if (root.namespaceURI !== SVG_NS) return { ok: false, errors: [{ message: `<svg> needs xmlns="${SVG_NS}" or nothing will render`, line: 1 }] }
 
+  // number every element in document order, matching the source map, before anything is removed
+  ;[root, ...root.querySelectorAll('*')].forEach((el, i) => el.setAttribute('data-art-i', String(i)))
+
   const warnings: Issue[] = []
   const counts = new Map<string, number>()
   const note = (msg: string) => counts.set(msg, (counts.get(msg) ?? 0) + 1)
