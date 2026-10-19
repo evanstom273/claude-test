@@ -52,7 +52,7 @@ const RANGES: Record<keyof Genome, [number, number, boolean?]> = {
   spikes: [0, 1],
   tail: [0, 1],
   fertility: [0.5, 1.5],
-  lifespan: [60, 260],
+  lifespan: [240, 720],
 }
 
 const KEYS = Object.keys(RANGES) as (keyof Genome)[]
@@ -78,11 +78,11 @@ export function mutate(parent: Genome, r: Rand, rate = 1): Genome {
   for (const k of KEYS) {
     const [lo, hi, int] = RANGES[k]
     if (int) {
-      if (r() < 0.04 * rate) g[k] = clamp(g[k] + (r() < 0.5 ? -1 : 1), lo, hi)
+      if (r() < 0.02 * rate) g[k] = clamp(g[k] + (r() < 0.5 ? -1 : 1), lo, hi)
     } else if (k === 'hue' || k === 'accent') {
-      g[k] = (g[k] + gauss(r) * 8 * rate + 360) % 360
+      g[k] = (g[k] + gauss(r) * 3 * rate + 360) % 360
     } else {
-      g[k] = clamp(g[k] + gauss(r) * (hi - lo) * 0.035 * rate, lo, hi)
+      g[k] = clamp(g[k] + gauss(r) * (hi - lo) * 0.02 * rate, lo, hi)
     }
   }
   return g

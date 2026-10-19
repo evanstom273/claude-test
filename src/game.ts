@@ -2,7 +2,7 @@ import { CELL } from './render/creatureArt'
 import { Renderer } from './render/renderer'
 import { isPredator } from './sim/creature'
 import type { Genome } from './sim/genome'
-import { Simulation, TICK, type SimEvent, type Tool } from './sim/sim'
+import { Simulation, TICK, type SimEvent, type Tool, type WorldSize } from './sim/sim'
 
 export interface SpeciesView {
   id: number
@@ -69,8 +69,11 @@ export class Game {
   private keys = new Set<string>()
   private detachFns: (() => void)[] = []
 
-  constructor(public canvas: HTMLCanvasElement) {
-    this.sim = new Simulation()
+  constructor(
+    public canvas: HTMLCanvasElement,
+    size: WorldSize,
+  ) {
+    this.sim = new Simulation(size)
     this.renderer = new Renderer(canvas, this.sim.world)
     this.snap = this.buildSnapshot()
   }
@@ -99,15 +102,15 @@ export class Game {
   }
 
   private frame(dt: number) {
-    // fixed simulation ticks, as many as the speed asks for (capped so a slow phone doesn't spiral)
+    // fixed simulation ticks, as many as the speed asks for, but never more than a slice of the
+    // frame: if the device can't keep up, the world simply runs a little slower than asked
     this.acc += dt * this.speed
-    let steps = 0
-    while (this.acc >= TICK && steps < 30) {
+    const start = performance.now()
+    while (this.acc >= TICK && performance.now() - start < 10) {
       this.sim.step()
       this.acc -= TICK
-      steps++
     }
-    if (steps === 30) this.acc = 0
+    if (this.acc > TICK * 3) this.acc = TICK * 3
     // held brushes keep working while the pointer is down
     if (this.drag?.mode === 'tool' && this.cursor && ['raise', 'lower', 'plants', 'rain'].includes(this.tool)) this.useTool(dt)
     this.panKeys(dt)

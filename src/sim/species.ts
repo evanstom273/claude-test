@@ -25,7 +25,7 @@ export interface Species {
 export const HISTORY_STEP = 2
 const HISTORY_MAX = 400
 /** Genetic distance at which a lineage counts as a new species. */
-export const SPECIATION = 1.6
+export const SPECIATION = 1.4
 /** Members a new species needs before it is shown and announced. */
 export const ESTABLISHED = 4
 

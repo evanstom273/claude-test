@@ -11,7 +11,7 @@ import type { Genome } from '../sim/genome'
 /** World pixels per cell. */
 export const CELL = 16
 /** How many facings are pre-drawn, and walk frames per facing. */
-export const ROTATIONS = 16
+export const ROTATIONS = 8
 export const FRAMES = 4
 
 const INK = '#141412'

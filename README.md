@@ -9,6 +9,8 @@ A god sandbox in the spirit of WorldBox and Spore: a top-down island where life 
 - **God tools.** Look (follow a creature's life), raise and lower land, sow plants, rain, create life, and call down meteors.
 - **Watch it unfold.** A species list with population sparklines, a population graph, a creature inspector with its lineage, and news as species arise and die out. Run at 1×, 3× or 10×, or pause.
 
+World sizes: Small (181 × 181 cells), Medium (256²), Large (362²) and Huge (512²), each with twice the land of the one before.
+
 Controls: drag to move the map, scroll or pinch to zoom, Space to pause, 1–4 for speed, WASD or arrows to pan.
 
 Built with React, Vite, TypeScript and Tailwind on a plain canvas. Art follows `ART_STYLE.md` (cel-shaded, layered SVG), seen straight from above. `src/sim` is the simulation (world, genomes, species, creatures), `src/render` the terrain painter, creature and plant art and renderer, and `src/ui` the panels.

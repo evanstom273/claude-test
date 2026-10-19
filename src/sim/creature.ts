@@ -33,6 +33,10 @@ export interface Creature {
   breedCooldown: number
   /** Id of the creature it is chasing, if hunting. */
   prey: number | null
+  /** Seconds until it next looks around for food and danger. */
+  thinkTimer: number
+  /** The hunter it last saw, kept between looks. */
+  threat: number | null
   /** Seconds until it can lunge again after a bite. */
   lunge: number
   alive: boolean
@@ -57,4 +61,4 @@ export function stats(g: Genome) {
 export const plantEfficiency = (g: Genome) => Math.pow(1 - g.diet, 1.4)
 export const meatEfficiency = (g: Genome) => Math.pow(g.diet, 1.4)
 export const isPredator = (g: Genome) => g.diet > 0.45
-export const maturity = (g: Genome) => 12 + g.size * 8
+export const maturity = (g: Genome) => 35 + g.size * 20

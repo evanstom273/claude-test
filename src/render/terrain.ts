@@ -47,15 +47,19 @@ function sample(w: World, px: number, py: number) {
  * hill shading lit from the upper left, contour lines, inked biome borders,
  * water shaded by depth, and surf along the shore.
  */
-export function paintTerrain(w: World, cx: number, cy: number, canvas: HTMLCanvasElement) {
-  const size = CHUNK * CELL
-  canvas.width = size
-  canvas.height = size
+export function paintTerrain(w: World, cx: number, cy: number, canvas: HTMLCanvasElement, scale = 1) {
+  const span = CHUNK * CELL
+  const size = Math.round(span * scale)
+  const px = 1 / scale
+  if (canvas.width !== size) {
+    canvas.width = size
+    canvas.height = size
+  }
   const ctx = canvas.getContext('2d')!
   const img = ctx.createImageData(size, size)
   const d = img.data
-  const ox = cx * size
-  const oy = cy * size
+  const ox = cx * span
+  const oy = cy * span
   // sample one pixel beyond the edges so slopes and borders match the next chunk
   const W = size + 2
   const hs = new Float32Array(W * W)
@@ -64,7 +68,7 @@ export function paintTerrain(w: World, cx: number, cy: number, canvas: HTMLCanva
   const lits = new Float32Array(W * W)
   for (let y = 0; y < W; y++)
     for (let x = 0; x < W; x++) {
-      const s = sample(w, ox + x - 1, oy + y - 1)
+      const s = sample(w, ox + (x - 1) * px, oy + (y - 1) * px)
       hs[y * W + x] = s.h
       ms[y * W + x] = s.m
       bs[y * W + x] = classify(s.h, s.m)
@@ -79,8 +83,8 @@ export function paintTerrain(w: World, cx: number, cy: number, canvas: HTMLCanva
       let r = base[0]
       let g = base[1]
       let bl = base[2]
-      const wx = ox + x
-      const wy = oy + y
+      const wx = Math.floor(ox + x * px)
+      const wy = Math.floor(oy + y * px)
       // material mottling: broad patches and fine grain
       const mott = (valueNoise(wx * 0.045, wy * 0.045, 11) - 0.5) * 0.16 + (hash2(wx, wy, 5) - 0.5) * 0.05
       let shade = 1 + mott
@@ -103,6 +107,7 @@ export function paintTerrain(w: World, cx: number, cy: number, canvas: HTMLCanva
         // contour lines every few height steps
         const step = 0.035
         const c0 = Math.floor(h / step)
+        // (contours and borders are a pixel wide whatever the scale, so they thin out when zoomed out)
         if (Math.floor(hs[k + 1] / step) !== c0 || Math.floor(hs[k + W] / step) !== c0) shade *= 0.9
         // wet sand at the waterline
         if (b === Biome.Sand && h - SEA_LEVEL < 0.008) shade *= 0.82
@@ -117,6 +122,9 @@ export function paintTerrain(w: World, cx: number, cy: number, canvas: HTMLCanva
       d[p + 3] = 255
     }
   ctx.putImageData(img, 0, 0)
+  if (scale < 0.5) return
+  ctx.save()
+  ctx.scale(scale, scale)
   // small vector details: pebbles on rock and hills, ripples on sand
   for (let y = 0; y < CHUNK; y++)
     for (let x = 0; x < CHUNK; x++) {
@@ -152,4 +160,5 @@ export function paintTerrain(w: World, cx: number, cy: number, canvas: HTMLCanva
         ctx.stroke()
       }
     }
+  ctx.restore()
 }

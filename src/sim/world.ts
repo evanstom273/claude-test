@@ -38,10 +38,14 @@ export class World {
   /** Rotating start index so the plant update is spread across ticks. */
   private plantCursor = 0
 
+  /** Bigger maps get more hills and coves, not just bigger ones. */
+  readonly detail: number
+
   constructor(
     readonly size: number,
     readonly seed: number,
   ) {
+    this.detail = Math.sqrt(size / 128)
     const n = size * size
     this.height = new Float32Array(n)
     this.moisture = new Float32Array(n)
@@ -85,12 +89,12 @@ export class World {
         const dy = ny - 0.5
         const d = Math.sqrt(dx * dx + dy * dy) * 2
         const falloff = Math.max(0, 1 - Math.pow(d, 2.2))
-        const n = fbm(nx * 5, ny * 5, seed)
-        const ridge = 1 - Math.abs(fbm(nx * 3, ny * 3, seed + 7) * 2 - 1)
+        const n = fbm(nx * this.detail * 5, ny * this.detail * 5, seed, 6)
+        const ridge = 1 - Math.abs(fbm(nx * this.detail * 3, ny * this.detail * 3, seed + 7) * 2 - 1)
         const h = (n * 0.75 + ridge * 0.35) * (0.25 + falloff * 0.95) - 0.05
         const i = this.idx(x, y)
         this.height[i] = Math.max(0, Math.min(1, h))
-        this.moisture[i] = fbm(nx * 4 + 31, ny * 4 + 17, seed + 3)
+        this.moisture[i] = fbm(nx * this.detail * 4 + 31, ny * this.detail * 4 + 17, seed + 3)
       }
     for (let i = 0; i < size * size; i++) this.classify(i)
     // start with plants about half grown wherever they can live
@@ -184,7 +188,7 @@ export class World {
       if (cap <= 0) continue
       const p = this.plants[i]
       const wet = 1 + this.rain[i] * 2.5 + this.moisture[i] * 0.5
-      if (p > 0.01) this.plants[i] = Math.min(cap, p + p * (1 - p / cap) * 0.05 * wet * step)
+      if (p > 0.01) this.plants[i] = Math.min(cap, p + p * (1 - p / cap) * 0.025 * wet * step)
       else {
         // bare ground is reseeded from a neighbour
         const x = i % s
