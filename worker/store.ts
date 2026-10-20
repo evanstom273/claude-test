@@ -26,6 +26,16 @@ export interface VersionInfo {
   size: number
 }
 
+export interface Export {
+  token: string
+  artwork_id: string
+  version: number
+  format: 'png' | 'svg'
+  width: number | null
+  background: string | null
+  expires: number
+}
+
 export interface Loop {
   id: string
   artwork_id: string
@@ -54,6 +64,7 @@ export class ArtStore extends DurableObject<Env> {
       CREATE TABLE IF NOT EXISTS artworks (id TEXT PRIMARY KEY, name TEXT NOT NULL, svg TEXT NOT NULL, version INTEGER NOT NULL, created INTEGER NOT NULL, updated INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS versions (artwork_id TEXT NOT NULL, version INTEGER NOT NULL, svg TEXT NOT NULL, note TEXT NOT NULL, created INTEGER NOT NULL, PRIMARY KEY (artwork_id, version));
       CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS exports (token TEXT PRIMARY KEY, artwork_id TEXT NOT NULL, version INTEGER NOT NULL, format TEXT NOT NULL, width INTEGER, background TEXT, expires INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS loops (id TEXT PRIMARY KEY, artwork_id TEXT NOT NULL, goal TEXT NOT NULL, max_rounds INTEGER NOT NULL, round INTEGER NOT NULL, status TEXT NOT NULL, created INTEGER NOT NULL, updated INTEGER NOT NULL);
     `)
   }
@@ -98,6 +109,7 @@ export class ArtStore extends DurableObject<Env> {
     this.sql.exec('DELETE FROM artworks WHERE id = ?', id)
     this.sql.exec('DELETE FROM versions WHERE artwork_id = ?', id)
     this.sql.exec('DELETE FROM loops WHERE artwork_id = ?', id)
+    this.sql.exec('DELETE FROM exports WHERE artwork_id = ?', id)
     return true
   }
 
@@ -117,6 +129,20 @@ export class ArtStore extends DurableObject<Env> {
 
   setSetting(key: string, value: string) {
     this.sql.exec('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value', key, value)
+  }
+
+  /** A download link for one version of an artwork, valid for a day. */
+  createExport(artworkId: string, version: number, format: Export['format'], width: number | null, background: string | null): Export {
+    const now = Date.now()
+    this.sql.exec('DELETE FROM exports WHERE expires < ?', now)
+    const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '')
+    this.sql.exec('INSERT INTO exports (token, artwork_id, version, format, width, background, expires) VALUES (?, ?, ?, ?, ?, ?, ?)', token, artworkId, version, format, width, background, now + 24 * 60 * 60 * 1000)
+    return this.export(token)!
+  }
+
+  export(token: string): Export | null {
+    const rows = this.sql.exec<Export & Record<string, SqlStorageValue>>('SELECT * FROM exports WHERE token = ? AND expires >= ?', token, Date.now()).toArray()
+    return rows[0] ?? null
   }
 
   startLoop(artworkId: string, goal: string, maxRounds: number): Loop {
