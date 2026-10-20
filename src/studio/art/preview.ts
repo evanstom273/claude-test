@@ -39,7 +39,6 @@ export class Preview {
   private viewport: HTMLDivElement
   private board: HTMLDivElement
   private grid: HTMLDivElement
-  private banner: HTMLDivElement
   private rulerTop: HTMLCanvasElement
   private rulerLeft: HTMLCanvasElement
   private size = { width: 300, height: 150, viewBox: null as number[] | null }
@@ -81,19 +80,16 @@ export class Preview {
       :host(.clean) .board { background: none; box-shadow: none; }
       :host(.clean) .grid, :host(.clean) .overlay { display: none; }
       .overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
-      .banner { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); padding: 6px 12px; border-radius: 999px; background: #7c4dffe6; color: #fff; font: 600 12px system-ui, sans-serif; pointer-events: none; z-index: 3; }
-      .banner[hidden] { display: none; }
       canvas.ruler { position: absolute; display: none; z-index: 2; background: #17171c; }
       :host(.rulers) canvas.ruler { display: block; }
       .rt { left: 0; top: 0; height: 18px; width: 100%; cursor: s-resize; }
       .rl { left: 0; top: 0; width: 18px; height: 100%; cursor: e-resize; }
     </style><div class="viewport"><div class="board"><div class="grid"></div></div></div>
-    <svg class="overlay"><g></g></svg><canvas class="ruler rt"></canvas><canvas class="ruler rl"></canvas><div class="banner" hidden></div>`
+    <svg class="overlay"><g></g></svg><canvas class="ruler rt"></canvas><canvas class="ruler rl"></canvas>`
     this.viewport = root.querySelector('.viewport')!
     this.board = root.querySelector('.board')!
     this.grid = root.querySelector('.grid')!
     this.overlay = root.querySelector('.overlay g')!
-    this.banner = root.querySelector('.banner')!
     this.rulerTop = root.querySelector('.rt')!
     this.rulerLeft = root.querySelector('.rl')!
     this.bindInput()
@@ -150,11 +146,6 @@ export class Preview {
   /** Preview mode: just the artwork, as it will export, with no editor overlays. */
   setClean(on: boolean) {
     this.host.classList.toggle('clean', on)
-  }
-
-  setBanner(text: string | null) {
-    this.banner.hidden = !text
-    if (text) this.banner.textContent = text
   }
 
   get artSize() {

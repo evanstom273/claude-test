@@ -7,7 +7,6 @@ import { oneDark } from '@codemirror/theme-one-dark'
 import { EditorView, keymap } from '@codemirror/view'
 import { basicSetup } from 'codemirror'
 import './art.css'
-import { AiPanel, type AiTarget } from './aiPanel'
 import { boxPoint, isGraphic, rootBox, rootRotation, unionBox, type Box } from './geometry'
 import { Inspector, toHex, type InspectorChange } from './inspector'
 import { Layers } from './layers'
@@ -18,7 +17,7 @@ import { attr, chunk, childIndent, elementAt, idsIn, insertionPoint, scan, setAt
 import { deleteArtwork, getArtwork, getDraft, listArtworks, newId, putArtwork, putDraft, type ArtMeta, type Artwork } from './store'
 import { xmlSchema } from './svgSchema'
 import { Tools, type DrawStyle, type ToolName } from './tools'
-import { artSize, formatSvg, parseSvg, SVG_NS, type Issue } from './validate'
+import { artSize, formatSvg, parseSvg, type Issue } from './validate'
 
 /**
  * Art Studio: SVG source and canvas kept in step. The code is the document;
@@ -33,7 +32,7 @@ const BLANK = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" 
 `
 
 type SourcePlace = 'bottom' | 'side' | 'hidden'
-type Tab = 'layers' | 'inspector' | 'source' | 'ai'
+type Tab = 'layers' | 'inspector' | 'source'
 
 /** Marks editor changes made by the studio itself, rather than typed. */
 const fromStudio = Annotation.define<boolean>()
@@ -87,7 +86,6 @@ export class ArtStudio {
   private preview = new Preview()
   private layers: Layers
   private inspector = new Inspector()
-  private ai: AiPanel
   private ops: Ops
   private tools: Tools
   private doc = { id: null as string | null, name: 'Untitled', saved: BLANK, savedMeta: '{}' }
@@ -99,7 +97,6 @@ export class ArtStudio {
   /** The selection, as the source positions where its tags start, so it follows edits. */
   private selPos: number[] = []
   private sel: number[] = []
-  private proposal: { from: number; to: number; insert: string } | null = null
   private renderTimer = 0
   private draftTimer = 0
   private place: SourcePlace = 'bottom'
@@ -133,8 +130,6 @@ export class ArtStudio {
           <button type="button" role="menuitemradio" data-act="srcBottom">Source below</button>
           <button type="button" role="menuitemradio" data-act="srcSide">Source beside canvas</button>
           <button type="button" role="menuitemradio" data-act="srcHidden">Hide source</button>
-          <hr>
-          ${item('aiSettings', 'AI settings…')}
         </div>
       </header>
       <div class="art-sub">
@@ -182,7 +177,6 @@ export class ArtStudio {
         </section>
         <aside class="col-right">
         <section class="p-inspector" aria-label="Inspector"><h3>Inspector</h3></section>
-        <section class="p-ai" aria-label="AI Art Assistant"></section>
         </aside>
         <section class="p-source" aria-label="SVG source">
           <div class="src-resize" role="separator" aria-label="Resize source panel" tabindex="0"></div>
@@ -198,7 +192,6 @@ export class ArtStudio {
           <button type="button" role="tab" data-tab="layers">Layers</button>
           <button type="button" role="tab" data-tab="inspector">Inspector</button>
           <button type="button" role="tab" data-tab="source">Source</button>
-          <button type="button" role="tab" data-tab="ai">AI</button>
         </nav>
       </div>
       <input type="file" accept=".svg,image/svg+xml" hidden />`
@@ -269,15 +262,6 @@ export class ArtStudio {
     })
     q('.p-layers').appendChild(this.layers.el)
     q('.p-inspector').appendChild(this.inspector.el)
-    this.ai = new AiPanel({
-      source: () => this.source,
-      blank: () => this.valid && (this.els[0]?.children ?? []).every((c) => ['defs', 'title', 'desc', 'metadata', 'style'].includes(c.name)),
-      selection: () => this.aiSelection(),
-      propose: (t, r, show) => this.propose(t, r, show),
-      accept: () => this.acceptProposal(),
-      reject: () => this.rejectProposal(),
-    })
-    q('.p-ai').appendChild(this.ai.el)
 
     this.view = new EditorView({ parent: q('.p-source .code'), state: this.state(BLANK) })
 
@@ -297,7 +281,7 @@ export class ArtStudio {
     this.preview.setGrid(this.grid)
     this.preview.setRulers(!!pref.rulers)
     this.setPlace(pref.place ?? 'bottom')
-    this.setTab(pref.tab ?? 'source')
+    this.setTab(pref.tab && ['layers', 'inspector', 'source'].includes(pref.tab) ? pref.tab : 'source')
     this.syncChecks()
     this.setTool('select')
     this.bindUi()
@@ -349,7 +333,6 @@ export class ArtStudio {
     this.doc = { id, name, saved, savedMeta: JSON.stringify(savedMeta ?? {}) }
     this.meta = meta
     this.selPos = []
-    this.proposal = null
     this.view.setState(this.state(source))
     this.render()
     this.updateButtons()
@@ -358,11 +341,6 @@ export class ArtStudio {
 
   private changed(typed: boolean) {
     this.updateName()
-    if (this.proposal) {
-      this.proposal = null
-      this.preview.setBanner(null)
-      this.ai.dropProposal()
-    }
     clearTimeout(this.renderTimer)
     // typing waits for a pause; studio edits redraw at once
     if (typed) this.renderTimer = window.setTimeout(() => this.render(), 200)
@@ -479,7 +457,6 @@ export class ArtStudio {
     const one = this.sel.length === 1 ? this.els[this.sel[0]] : null
     const id = one ? attr(one, 'id')?.value : null
     this.$.selinfo.textContent = one ? `Selection: ${id ?? ''}${id ? ' ' : ''}${one.name === 'g' ? 'group' : `<${one.name}>`}` : this.sel.length ? `${this.sel.length} objects selected` : 'Nothing selected'
-    this.ai.refresh()
   }
 
   private refreshInspector() {
@@ -703,49 +680,6 @@ export class ArtStudio {
     if (!box) return
     const o = boxPoint(box, this.inspector.origin.x, this.inspector.origin.y)
     this.ops.transformAll(new DOMMatrix().translate(o.x, o.y).scale(axis === 'x' ? -1 : 1, axis === 'y' ? -1 : 1).translate(-o.x, -o.y))
-  }
-
-  // ---- AI proposals ----
-
-  private aiSelection(): AiTarget | null {
-    if (!this.sel.length || !this.valid) return null
-    const e = this.els[this.sel[this.sel.length - 1]]
-    const id = attr(e, 'id')?.value
-    if (e.i === 0) return { from: 0, to: this.source.length, text: this.source, label: 'the whole artwork', whole: true }
-    return { from: e.start, to: e.end, text: this.source.slice(e.start, e.end), label: id ? `#${id}` : `<${e.name}>`, whole: false }
-  }
-
-  /** Check a replacement; with show, also preview it on the canvas. Returns an error message if it doesn't work. */
-  private propose(t: AiTarget, replacement: string, show = true): string | null {
-    if (!t.whole) {
-      const check = parseSvg(`<svg xmlns="${SVG_NS}" xmlns:xlink="http://www.w3.org/1999/xlink">${replacement}</svg>`)
-      if (!check.ok) return check.errors[0].message
-      if (!check.svg.firstElementChild) return 'it contained no SVG element'
-    }
-    const src = this.source
-    const next = src.slice(0, t.from) + replacement + src.slice(t.to)
-    const r = parseSvg(next)
-    if (!r.ok) return r.errors[0].message
-    if (!show) return null
-    this.proposal = { from: t.from, to: t.to, insert: replacement }
-    this.preview.show(r.svg)
-    this.preview.drawOverlay('')
-    this.preview.setBanner('Previewing AI change')
-    return null
-  }
-
-  private acceptProposal() {
-    const p = this.proposal
-    if (!p) return
-    this.proposal = null
-    this.preview.setBanner(null)
-    this.view.dispatch({ changes: p, annotations: [fromStudio.of(true), isolateHistory.of('full')], userEvent: 'studio' })
-  }
-
-  private rejectProposal() {
-    this.proposal = null
-    this.preview.setBanner(null)
-    this.render()
   }
 
   // ---- file operations ----
@@ -972,7 +906,6 @@ export class ArtStudio {
         this.$.maxSrc.setAttribute('aria-pressed', String(on))
         this.view.requestMeasure()
       },
-      aiSettings: () => this.ai.el.querySelector<HTMLButtonElement>('.model')!.click(),
     }
     this.root.addEventListener('click', (e) => {
       const t = e.target as HTMLElement

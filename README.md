@@ -8,7 +8,7 @@ The start of a cartoon studio in the browser, at https://evanstom273.github.io/c
 
 `src/studio/art/`: SVG source and canvas kept in step.
 
-- **Layout:** header, tools, layers, canvas, inspector, AI assistant and SVG source. On phones, the canvas sits above a tab bar.
+- **Layout:** header, tools, layers, canvas, inspector and SVG source. On phones, the canvas sits above a tab bar.
 - **Tools** (`tools.ts`):
   - **Select:** tap, Shift to add, double-tap to go into groups, box-select, move with snapping, and handles to resize (Shift keeps proportions, Alt from the centre) and rotate (Shift snaps to 15°).
   - **Node editing:** drag nodes and handles, add, delete, smooth or corner, close or open, split, join.
@@ -23,7 +23,6 @@ The start of a cartoon studio in the browser, at https://evanstom273.github.io/c
 - **Navigation and snapping:** pan (hand tool, Space-drag, two fingers, wheel), zoom, fit artwork or selection, rulers, guides dragged out of the rulers, a grid, and snapping to the grid, guides and other objects with pink alignment lines.
 - **Code editor:** CodeMirror 6, with SVG autocomplete, validation, formatting and lint markers. If the code is broken, the canvas keeps the last valid version.
 - **Safety:** previews are sanitised (no scripts, event attributes or external resources) and rendered in a shadow root.
-- **AI assistant (paused):** Gemini, with your own key stored on this device. It creates or edits artwork with a self-review step and shows the result to accept or reject.
 - **Storage:** Dexie (IndexedDB) holds artworks, the autosaved working copy and editor-only metadata such as guides, stored beside the SVG and never inside it.
 
 ## The Dorseys: "Smart Toast"
