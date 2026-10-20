@@ -1,8 +1,10 @@
-// Cloudflare Workers deploy for the studio: serves the built site from dist.
-// Having this file stops wrangler trying to auto-configure the Vite project.
+// Cloudflare Workers deploy for the studio. worker/index.ts handles requests
+// (serving the built site from dist for now); having a script means the
+// Worker can hold secrets, which the MCP server will need.
 {
   "name": "art-engine",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-10-19",
   "observability": { "enabled": true },
-  "assets": { "directory": "./dist" }
+  "assets": { "directory": "./dist", "binding": "ASSETS" }
 }
