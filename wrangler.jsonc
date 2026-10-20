@@ -1,0 +1,8 @@
+// Cloudflare Workers deploy for the studio: serves the built site from dist.
+// Having this file stops wrangler trying to auto-configure the Vite project.
+{
+  "name": "art-engine",
+  "compatibility_date": "2026-10-19",
+  "observability": { "enabled": true },
+  "assets": { "directory": "./dist" }
+}
