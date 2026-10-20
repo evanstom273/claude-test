@@ -9,7 +9,6 @@ export interface Env {
   OAUTH_PROVIDER: OAuthHelpers
   GITHUB_CLIENT_ID: string
   GITHUB_CLIENT_SECRET: string
-  COOKIE_ENCRYPTION_KEY: string
 }
 
 /** The only GitHub account allowed in. */

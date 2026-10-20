@@ -53,8 +53,6 @@ async function githubRedirect(env: Env, req: Request, state: string, verifier: s
   return u.toString()
 }
 
-const remember = (env: Env) => ({ secret: env.COOKIE_ENCRYPTION_KEY })
-
 /** Start the GitHub sign-in for an approved request. */
 async function toGithub(env: Env, req: Request, request: Parameters<Env['OAUTH_PROVIDER']['beginUpstream']>[0], headers?: Headers) {
   const verifier = crypto.randomUUID() + crypto.randomUUID()
@@ -67,7 +65,6 @@ async function authorize(req: Request, env: Env) {
   const oauth = env.OAUTH_PROVIDER
   if (req.method === 'GET') {
     const request = await oauth.parseAuthRequest(req)
-    if (await oauth.isConsentRemembered(req, request, remember(env))) return toGithub(env, req, request)
     const details = await oauth.describeConsent(request)
     const consent = await oauth.beginConsent(request)
     return consentPage(details, consent.handle, consent.headers)
@@ -78,7 +75,7 @@ async function authorize(req: Request, env: Env) {
     const denied = await oauth.denyConsent(req, handle)
     return new Response(null, { status: 302, headers: denied.headers })
   }
-  const approved = await oauth.approveConsent(req, handle, { scope: ['art'], remember: remember(env) })
+  const approved = await oauth.approveConsent(req, handle, { scope: ['art'] })
   return toGithub(env, req, approved.request, approved.headers)
 }
 
