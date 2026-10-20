@@ -21,7 +21,7 @@ export default new OAuthProvider<Env>({
       // the token can only have been issued to the allowed account, but check anyway
       const props = (ctx as ExecutionContext & { props?: { login?: string } }).props
       if (props?.login?.toLowerCase() !== ALLOWED_LOGIN.toLowerCase()) return new Response('Forbidden', { status: 403 })
-      return createMcpHandler(() => createServer(env))(request, env, ctx)
+      return createMcpHandler(() => createServer(env, new URL(request.url).origin))(request, env, ctx)
     },
   },
   defaultHandler,

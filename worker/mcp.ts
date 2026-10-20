@@ -13,6 +13,7 @@ const INSTRUCTIONS = `This is the Art Studio: SVG artwork for a 2D cartoon.
 - After every change you get a rendered image back. Look at it properly and fix what's wrong (parts that don't join, wrong proportions, inconsistent perspective or line weight) before moving on.
 - Prefer edit_artwork for small changes; it keeps everything else exactly as it was.
 - Build characters and complex objects in named groups (id="head", id="arm-left"), part by part.
+- To give the user a file for other apps, use export_artwork (PNG or SVG) and pass on the link.
 - For iterative refinement towards a goal, use loop_artwork, then loop_step until you're satisfied or the round limit is reached.`
 
 type Content = { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }
@@ -62,7 +63,7 @@ async function picture(svg: string, opts: { width?: number; background?: string;
 
 const warn = (w: string[]) => (w.length ? `\nWarnings: ${w.join('; ')}.` : '')
 
-export function createServer(env: Env) {
+export function createServer(env: Env, origin: string) {
   const db = store(env)
   const server = new McpServer({ name: 'art-engine', version: '1.0.0' }, { instructions: INSTRUCTIONS })
 
@@ -170,6 +171,30 @@ export function createServer(env: Env) {
       const err = await parseError(source)
       if (err) return fail(`The SVG doesn't parse: ${err}`)
       return { content: await picture(source, { width, background: background === 'transparent' ? undefined : (background ?? '#ffffff'), region }) }
+    },
+  )
+
+  server.registerTool(
+    'export_artwork',
+    {
+      description: 'Make a download link for an artwork as a PNG or SVG file, so the user can take it into other apps. The link works for 24 hours.',
+      inputSchema: z.object({
+        id: z.string(),
+        format: z.enum(['png', 'svg']),
+        version: z.number().int().positive().optional().describe('Export an older version (default: the current one)'),
+        width: z.number().int().min(64).max(2048).optional().describe('PNG width in pixels (default 1024)'),
+        background: z.string().optional().describe('PNG background colour (default white); "transparent" for none'),
+      }),
+      annotations: { readOnlyHint: true },
+    },
+    async ({ id, format, version, width, background }) => {
+      const a = await db.get(id)
+      if (!a) return fail(`No artwork with id "${id}".`)
+      const v = version ?? a.version
+      if (!(await db.version(id, v))) return fail(`"${a.name}" has no version ${v}.`)
+      const png = format === 'png'
+      const e = await db.createExport(id, v, format, png ? (width ?? 1024) : null, png ? (background ?? '#ffffff') : null)
+      return { content: [text(`Download "${a.name}" (version ${v}) as ${format.toUpperCase()}: ${origin}/export/${e.token}/${id}.${format}\nThe link works for 24 hours. Give it to the user as is.`)] }
     },
   )
 

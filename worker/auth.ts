@@ -1,5 +1,6 @@
 import { AuthorizationError, authorizationErrorRedirect, CimdFetchError, type ConsentDescription } from '@cloudflare/workers-oauth-provider'
 import { ALLOWED_LOGIN, type Env } from './env'
+import { serveExport } from './export'
 
 /**
  * Signing in: MCP clients (Claude) are sent here, the user approves on a
@@ -117,13 +118,14 @@ async function callback(req: Request, env: Env) {
   return new Response(null, { status: 302, headers })
 }
 
-/** Everything that isn't the MCP endpoint or the OAuth token machinery. */
+/** Everything that isn't the MCP endpoint or the OAuth token machinery, including export downloads. */
 export const defaultHandler: ExportedHandler<Env> = {
   async fetch(req, env) {
     const path = new URL(req.url).pathname
     try {
       if (path === '/authorize') return await authorize(req, env)
       if (path === '/callback') return await callback(req, env)
+      if (path.startsWith('/export/')) return await serveExport(req, env)
     } catch (e) {
       if (e instanceof AuthorizationError && e.redirectTo) return Response.redirect(e.redirectTo, 302)
       if (e instanceof AuthorizationError || e instanceof CimdFetchError) {
