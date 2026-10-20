@@ -1,10 +1,16 @@
-// Cloudflare Workers deploy for the studio. worker/index.ts handles requests
-// (serving the built site from dist for now); having a script means the
-// Worker can hold secrets, which the MCP server will need.
+// The art-engine Worker: the Art Studio's MCP server (worker/) plus the
+// studio's built site from dist. The KV namespace is created automatically
+// on first deploy. Secrets (set in the dashboard): GITHUB_CLIENT_ID,
+// GITHUB_CLIENT_SECRET, COOKIE_ENCRYPTION_KEY.
 {
   "name": "art-engine",
   "main": "worker/index.ts",
   "compatibility_date": "2026-10-19",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "observability": { "enabled": true },
-  "assets": { "directory": "./dist", "binding": "ASSETS" }
+  "assets": { "directory": "./dist", "binding": "ASSETS" },
+  "kv_namespaces": [{ "binding": "OAUTH_KV" }],
+  "durable_objects": { "bindings": [{ "name": "ART_STORE", "class_name": "ArtStore" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ArtStore"] }],
+  "rules": [{ "type": "Data", "globs": ["**/*.ttf"], "fallthrough": true }]
 }
