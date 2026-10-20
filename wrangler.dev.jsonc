@@ -1,0 +1,10 @@
+// Local-only config for testing the MCP tools without sign-in (npm run dev:worker).
+{
+  "name": "art-engine-dev",
+  "main": "worker/dev.ts",
+  "compatibility_date": "2026-10-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": { "bindings": [{ "name": "ART_STORE", "class_name": "ArtStore" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ArtStore"] }],
+  "rules": [{ "type": "Data", "globs": ["**/*.ttf"], "fallthrough": true }]
+}
